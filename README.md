@@ -25,6 +25,10 @@ You can filter the workspaces by:
 
 ## 1. Register an Entra application (one-time)
 
+> 📘 For a detailed, link-by-link walkthrough (app registration, redirect URI,
+> delegated permissions, admin consent and tenant settings) see
+> **[QUICKSTART.md](QUICKSTART.md)**.
+
 1. Go to **Microsoft Entra admin center › App registrations › New registration**.
 2. Name it e.g. `Fabric Capacity Manager (dev)`.
 3. Supported account types: **Accounts in this organizational directory only**.
