@@ -1,0 +1,26 @@
+{
+  "name": "fabric-capacity-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local dev SPA to explore Microsoft Fabric workspaces grouped by Region, Capacity SKU and Capacity Name.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^3.28.1",
+    "@azure/msal-react": "^2.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/authconfig.ts","./src/main.tsx","./src/types.ts","./src/api/fabricapi.ts","./src/components/filterspanel.tsx","./src/components/workspacetree.tsx","./src/export/exportexcel.ts","./src/hooks/usefabricdata.ts","./vite-env.d.ts"],"version":"5.9.3"}
