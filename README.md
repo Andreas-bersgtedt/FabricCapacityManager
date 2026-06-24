@@ -102,3 +102,27 @@ format. Workspaces with no semantic models report **No semantic model**.
 ## License
 
 Released under the [MIT License](./LICENSE). © 2026 Andreas Bergstedt.
+
+## Disclaimer of warranty and limitation of liability
+
+THIS SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+The authors and copyright holders make no representation or warranty that the
+software is accurate, complete, reliable, secure, or error-free, or that it will
+meet your requirements or operate without interruption.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE AUTHORS
+OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY
+(INCLUDING WITHOUT LIMITATION ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES, LOSS OF DATA, LOSS OF PROFITS, OR BUSINESS
+INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE OF, OR INABILITY TO USE, THIS
+SOFTWARE, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, EVEN IF ADVISED
+OF THE POSSIBILITY OF SUCH DAMAGE.
+
+This project is an independent, community-built tool. It is **not** an official
+Microsoft product and is not endorsed by, affiliated with, or supported by
+Microsoft Corporation. "Microsoft", "Microsoft Fabric", "Power BI", and "Azure"
+are trademarks of the Microsoft group of companies. You are solely responsible
+for your use of this software and for complying with the terms governing the
+Microsoft services and APIs it calls.

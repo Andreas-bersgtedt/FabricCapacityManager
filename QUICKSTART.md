@@ -227,3 +227,30 @@ users. Settings can take a few minutes to apply.
 - Keep `.env` out of source control (it's already in [.gitignore](.gitignore)).
 
 For the full feature overview and developer notes, see the [README](README.md).
+
+---
+
+## Disclaimer of warranty and limitation of liability
+
+THIS SOFTWARE AND THIS GUIDE ARE PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT
+WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT. The authors and copyright holders make no representation or
+warranty that the software or instructions are accurate, complete, reliable,
+secure, current, or error-free.
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE AUTHORS
+OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY
+(INCLUDING WITHOUT LIMITATION ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES, LOSS OF DATA, LOSS OF PROFITS, OR BUSINESS
+INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE OF, OR INABILITY TO USE, THIS
+SOFTWARE OR GUIDE, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Configuring app registrations, API permissions, consent, and tenant settings
+affects your organization's security posture. **You are solely responsible** for
+reviewing, approving, and auditing any changes you make by following this guide,
+and for ensuring they comply with your organization's policies and the terms
+governing the Microsoft services and APIs involved. This project is an
+independent, community-built tool and is **not** an official Microsoft product,
+nor endorsed by, affiliated with, or supported by Microsoft Corporation.
