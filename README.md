@@ -8,6 +8,10 @@ to, grouped by:
 
 **Region › Capacity SKU › Capacity Name**
 
+<p align="center">
+  <img src="docs/images/app-screenshot.png" alt="Fabric Capacity Manager UI showing workspaces grouped by region, capacity SKU and capacity name with storage-mode and item-type filters" width="900" />
+</p>
+
 You can filter the workspaces by:
 
 - **Storage mode** — Large dataset / Small dataset / No semantic model
