@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Sidebar filter controls: workspace name search, storage-mode checkboxes and
+// item-type checkboxes. The component is fully controlled — it renders the
+// current `filters` and reports every change through `onChange`.
+
 import type { Filters, StorageMode } from "../types";
 
+/** The storage-mode options shown as checkboxes, with their display labels. */
 const STORAGE_MODES: { value: StorageMode; label: string }[] = [
   { value: "Large", label: "Large dataset" },
   { value: "Small", label: "Small dataset" },
@@ -7,13 +15,19 @@ const STORAGE_MODES: { value: StorageMode; label: string }[] = [
 ];
 
 interface Props {
+  /** The current filter state. */
   filters: Filters;
+  /** All item types discovered across the loaded workspaces. */
   allItemTypes: string[];
+  /** Called with the next filter state whenever a control changes. */
   onChange: (next: Filters) => void;
+  /** Number of workspaces matching the current filters. */
   resultCount: number;
+  /** Total number of loaded workspaces. */
   totalCount: number;
 }
 
+/** Returns a new Set with `value` toggled in or out of `set` (immutable). */
 function toggle<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set);
   if (next.has(value)) next.delete(value);
@@ -21,6 +35,7 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
+/** Renders the filter sidebar. */
 export function FiltersPanel({
   filters,
   allItemTypes,

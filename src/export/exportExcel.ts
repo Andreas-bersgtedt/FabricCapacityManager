@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Client-side Excel export. Flattens enriched workspaces into a single sheet
+// and triggers a browser download using SheetJS — no server round-trip.
+
 import * as XLSX from "xlsx";
 import type { EnrichedWorkspace } from "../types";
 

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Thin REST client for the Microsoft Fabric and Power BI APIs. Provides helpers
+// to list capacities, workspaces and items, derive a workspace storage mode
+// from its semantic models, and run requests with bounded concurrency.
+
 import type { Capacity, FabricItem, StorageMode, Workspace } from "../types";
 
 const FABRIC_BASE = "https://api.fabric.microsoft.com/v1";

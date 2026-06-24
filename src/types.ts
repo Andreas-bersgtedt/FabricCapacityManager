@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Shared domain types used across the API client, hooks and UI components.
+
 /** Raw capacity as returned by the Fabric REST API (GET /v1/capacities). */
 export interface Capacity {
   id: string;

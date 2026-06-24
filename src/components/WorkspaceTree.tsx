@@ -1,10 +1,19 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Renders the workspaces as a collapsible three-level tree grouped by
+// Region › Capacity SKU › Capacity Name, with a per-capacity table of
+// workspaces, their storage mode and the item types they contain.
+
 import { useMemo } from "react";
 import type { EnrichedWorkspace } from "../types";
 
 interface Props {
+  /** The (already filtered) workspaces to display. */
   workspaces: EnrichedWorkspace[];
 }
 
+/** A node in the grouped tree. Leaf capacity nodes carry `workspaces`. */
 interface GroupNode {
   key: string;
   label: string;

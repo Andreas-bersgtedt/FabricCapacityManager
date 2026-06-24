@@ -1,5 +1,7 @@
 # Fabric Capacity Manager
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A **local dev-mode single-page app** that signs in to a Microsoft Fabric tenant
 with an OAuth web dialog (MSAL popup) and lists all workspaces you have access
 to, grouped by:
@@ -92,3 +94,7 @@ format. Workspaces with no semantic models report **No semantic model**.
   workspace it is reported as "No semantic model".
 - Item and dataset details are fetched per workspace with bounded concurrency,
   so the initial load can take a moment on large tenants.
+
+## License
+
+Released under the [MIT License](./LICENSE). © 2026 Andreas Bergstedt.

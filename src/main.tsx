@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Application entry point. Bootstraps MSAL, wires up the React tree inside an
+// MsalProvider, and renders the root <App /> component.
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import {
@@ -12,6 +18,11 @@ import "./styles.css";
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
+/**
+ * Initializes MSAL, restores the active account from the cache, subscribes to
+ * login events, and mounts the React application. MSAL v3 requires an explicit
+ * async `initialize()` call before any other API is used.
+ */
 async function bootstrap() {
   await msalInstance.initialize();
 

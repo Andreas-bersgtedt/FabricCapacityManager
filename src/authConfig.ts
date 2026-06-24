@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// MSAL authentication configuration and the delegated API scopes used to call
+// the Microsoft Fabric and Power BI REST APIs.
+
 import {
   type Configuration,
   LogLevel,

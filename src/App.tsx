@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// Root application component. Handles the authentication state (sign in / out),
+// triggers data loading, owns the client-side filter state and composes the
+// filters panel, the grouped workspace tree and the Excel export action.
+
 import { useMemo, useState } from "react";
 import {
   AuthenticatedTemplate,
@@ -11,12 +18,18 @@ import { WorkspaceTree } from "./components/WorkspaceTree";
 import { exportWorkspacesToExcel } from "./export/exportExcel";
 import type { EnrichedWorkspace, Filters } from "./types";
 
+/** Default filter state: nothing selected means "show everything". */
 const emptyFilters: Filters = {
   storageModes: new Set(),
   requiredItemTypes: new Set(),
   searchText: "",
 };
 
+/**
+ * Returns the subset of `workspaces` that satisfy every active filter:
+ * a case-insensitive name search, the selected storage modes (OR), and the
+ * required item types (AND — a workspace must contain all selected types).
+ */
 function applyFilters(
   workspaces: EnrichedWorkspace[],
   filters: Filters,
@@ -46,14 +59,17 @@ export default function App() {
   const { data, loading, error, progress, load } = useFabricData();
   const [filters, setFilters] = useState<Filters>(emptyFilters);
 
+  // Recompute the visible workspaces only when the data or filters change.
   const filtered = useMemo(
     () => (data ? applyFilters(data.workspaces, filters) : []),
     [data, filters],
   );
 
+  /** Starts the interactive OAuth sign-in (MSAL popup / web dialog). */
   const signIn = () => {
     instance.loginPopup(loginRequest).catch((e) => console.error(e));
   };
+  /** Signs the current user out via a popup. */
   const signOut = () => {
     instance.logoutPopup().catch((e) => console.error(e));
   };

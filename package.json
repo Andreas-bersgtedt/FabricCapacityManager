@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "description": "Local dev SPA to explore Microsoft Fabric workspaces grouped by Region, Capacity SKU and Capacity Name.",
+  "license": "MIT",
+  "author": "Andreas Bergstedt",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

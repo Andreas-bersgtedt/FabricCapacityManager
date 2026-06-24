@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Andreas Bergstedt
+//
+// React hook that orchestrates loading all Fabric data: it acquires tokens via
+// MSAL, fetches capacities and workspaces, then enriches every workspace with
+// its item types and storage mode, exposing loading/error/progress state.
+
 import { useCallback, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import {
@@ -20,6 +27,11 @@ import type {
   StorageMode,
 } from "../types";
 
+/**
+ * Builds a {@link TokenProvider} backed by MSAL. Tokens are acquired silently
+ * from the cache when possible, falling back to an interactive popup when the
+ * user must consent or re-authenticate (e.g. a different resource/scope).
+ */
 function createTokenProvider(
   instance: IPublicClientApplication,
   account: AccountInfo,
@@ -38,12 +50,20 @@ function createTokenProvider(
   };
 }
 
+/** Progress reported while enriching workspaces. */
 interface LoadProgress {
   total: number;
   done: number;
   phase: string;
 }
 
+/**
+ * Loads and enriches Fabric workspace data on demand.
+ *
+ * @returns An object with the loaded {@link FabricData} (or `null`), loading and
+ * error flags, the current {@link LoadProgress}, and a `load()` action that
+ * (re)fetches everything for the signed-in account.
+ */
 export function useFabricData() {
   const { instance, accounts } = useMsal();
   const [data, setData] = useState<FabricData | null>(null);
