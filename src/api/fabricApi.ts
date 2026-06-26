@@ -5,7 +5,13 @@
 // to list capacities, workspaces and items, derive a workspace storage mode
 // from its semantic models, and run requests with bounded concurrency.
 
-import type { Capacity, FabricItem, StorageMode, Workspace } from "../types";
+import type {
+  Capacity,
+  FabricItem,
+  StorageMode,
+  Workspace,
+  WorkspaceRole,
+} from "../types";
 
 const FABRIC_BASE = "https://api.fabric.microsoft.com/v1";
 const POWERBI_BASE = "https://api.powerbi.com/v1.0/myorg";
@@ -119,6 +125,152 @@ export async function getWorkspaceStorageMode(
   } catch {
     return "None";
   }
+}
+
+interface RoleAssignment {
+  id: string;
+  principal?: { id?: string; type?: string };
+  role?: WorkspaceRole;
+}
+
+/**
+ * Resolves the signed-in user's role on a workspace from its role assignments.
+ * Listing assignments requires workspace-admin permission, so a non-admin (or a
+ * missing permission) yields `undefined` — which the admin gate treats as "no
+ * manage rights".
+ */
+export async function getWorkspaceRole(
+  getToken: TokenProvider,
+  workspaceId: string,
+  userObjectId: string,
+): Promise<WorkspaceRole | undefined> {
+  try {
+    const token = await getToken([
+      "https://api.fabric.microsoft.com/Workspace.Read.All",
+    ]);
+    const assignments = await fabricGetAll<RoleAssignment>(
+      `/workspaces/${workspaceId}/roleAssignments`,
+      token,
+    );
+    const target = userObjectId.toLowerCase();
+    const mine = assignments.find(
+      (a) => a.principal?.id?.toLowerCase() === target,
+    );
+    return mine?.role;
+  } catch {
+    return undefined;
+  }
+}
+
+interface WorkspaceDetailsResponse {
+  id: string;
+  capacityRegion?: string;
+  capacityAssignmentProgress?: string;
+}
+
+/** Per-workspace capacity region and (re)assignment progress (single GET). */
+export interface WorkspaceDetails {
+  capacityRegion?: string;
+  capacityAssignmentProgress?: string;
+}
+
+/**
+ * Reads capacity region and assignment progress from GET /v1/workspaces/{id}
+ * (not returned by the list endpoint). Degrades gracefully to an empty object.
+ */
+export async function getWorkspaceDetails(
+  getToken: TokenProvider,
+  workspaceId: string,
+): Promise<WorkspaceDetails> {
+  try {
+    const token = await getToken([
+      "https://api.fabric.microsoft.com/Workspace.Read.All",
+    ]);
+    const ws = await httpGet<WorkspaceDetailsResponse>(
+      `${FABRIC_BASE}/workspaces/${workspaceId}`,
+      token,
+    );
+    return {
+      capacityRegion: ws.capacityRegion,
+      capacityAssignmentProgress: ws.capacityAssignmentProgress,
+    };
+  } catch {
+    return {};
+  }
+}
+
+interface AdminGroup {
+  id: string;
+  defaultDatasetStorageFormat?: string;
+}
+
+/**
+ * Bulk-reads each workspace's default semantic-model storage format via the
+ * Power BI admin API (GetGroupsAsAdmin). Requires the Fabric/Power BI admin role
+ * (Tenant.Read.All); returns an empty map when unavailable so callers degrade.
+ */
+export async function getAdminWorkspaceStorageFormats(
+  getToken: TokenProvider,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const token = await getToken([
+      "https://analysis.windows.net/powerbi/api/Tenant.Read.All",
+    ]);
+    const data = await httpGet<PagedResponse<AdminGroup>>(
+      `${POWERBI_BASE}/admin/groups?%24top=5000`,
+      token,
+    );
+    for (const g of data.value ?? []) {
+      if (g.defaultDatasetStorageFormat) {
+        map.set(g.id, g.defaultDatasetStorageFormat);
+      }
+    }
+  } catch {
+    // No admin permission / consent declined — surface nothing.
+  }
+  return map;
+}
+
+interface FabricDomain {
+  id: string;
+  displayName: string;
+}
+
+/**
+ * Resolves display names for the given (unique) governance domain ids via the
+ * core Get Domain endpoint. Unknown/unauthorized ids are skipped, so the result
+ * only contains ids that resolved. Reuses the existing Fabric read token.
+ */
+export async function getDomainNames(
+  getToken: TokenProvider,
+  domainIds: string[],
+): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  const unique = Array.from(new Set(domainIds.filter(Boolean)));
+  if (unique.length === 0) return names;
+  let token: string;
+  try {
+    token = await getToken([
+      "https://api.fabric.microsoft.com/Workspace.Read.All",
+    ]);
+  } catch {
+    return names;
+  }
+  await Promise.all(
+    unique.map(async (id) => {
+      try {
+        const domain = await httpGet<FabricDomain>(
+          `${FABRIC_BASE}/domains/${id}`,
+          token,
+        );
+        if (domain.displayName) names.set(id, domain.displayName);
+      } catch {
+        // Skip ids the caller can't read.
+      }
+    }),
+  );
+  return names;
 }
 
 /** Runs async tasks with a bounded concurrency. */

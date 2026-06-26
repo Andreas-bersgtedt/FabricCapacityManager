@@ -19,6 +19,8 @@ export interface Workspace {
   type: string;
   capacityId?: string;
   description?: string;
+  /** Id of the governance domain the workspace is assigned to, if any. */
+  domainId?: string;
 }
 
 /** Raw item as returned by GET /v1/workspaces/{id}/items. */
@@ -32,6 +34,9 @@ export interface FabricItem {
 /** Storage mode derived from Power BI semantic-model targetStorageMode. */
 export type StorageMode = "Large" | "Small" | "None";
 
+/** Fabric workspace role for a principal (GET /v1/workspaces/{id}/roleAssignments). */
+export type WorkspaceRole = "Admin" | "Member" | "Contributor" | "Viewer";
+
 /** A workspace enriched with capacity, item-type and storage-mode data. */
 export interface EnrichedWorkspace {
   id: string;
@@ -41,6 +46,22 @@ export interface EnrichedWorkspace {
   capacityName: string;
   sku: string;
   region: string;
+  /** Lifecycle state of the owning capacity (e.g. Active, Paused). */
+  capacityState?: string;
+  /** The signed-in user's role on this workspace, if resolvable. */
+  userRole?: WorkspaceRole;
+  /** Region of the assigned capacity (GET /v1/workspaces/{id}). */
+  capacityRegion?: string;
+  /** Capacity (re)assignment progress: Completed / InProgress / Failed. */
+  capacityAssignmentProgress?: string;
+  /** Workspace default semantic-model storage format (admin API). */
+  defaultStorageFormat?: string;
+  /** Governance domain the workspace is assigned to, if any. */
+  domainId?: string;
+  /** Resolved display name of the assigned domain, if available. */
+  domainName?: string;
+  /** Azure resource tags on the owning capacity (key/value). */
+  capacityTags?: Record<string, string>;
   /** Distinct item types present in the workspace (e.g. Lakehouse, Warehouse). */
   itemTypes: string[];
   itemCount: number;
@@ -52,6 +73,21 @@ export interface FabricData {
   workspaces: EnrichedWorkspace[];
   /** All distinct item types found across every workspace. */
   allItemTypes: string[];
+}
+
+/**
+ * Per-workspace OneLake storage usage (in GB) sourced from the Fabric Capacity
+ * Metrics app semantic model. Any field may be undefined when the underlying
+ * model does not expose that measure.
+ */
+export interface WorkspaceStorageUsage {
+  workspaceId: string;
+  /** Current OneLake storage in GB. */
+  currentGb?: number;
+  /** Billable OneLake storage in GB (includes soft-deleted data). */
+  billableGb?: number;
+  /** OneLake cache storage in GB. */
+  cacheGb?: number;
 }
 
 export interface Filters {

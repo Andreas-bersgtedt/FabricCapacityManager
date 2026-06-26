@@ -5,12 +5,35 @@
 // Region › Capacity SKU › Capacity Name, with a per-capacity table of
 // workspaces, their storage mode and the item types they contain.
 
-import { useMemo } from "react";
-import type { EnrichedWorkspace } from "../types";
+import { useMemo, useState } from "react";
+import type { Capacity, EnrichedWorkspace } from "../types";
+import type { WorkspaceStorageUsage } from "../types";
+import type { TokenProvider } from "../api/fabricApi";
+import type { CapacityPricing } from "../pricing/useCapacityPricing";
+import {
+  MoveWorkspaceCrossRegionDialog,
+  MoveWorkspaceSameGeoDialog,
+  PauseResumeCapacityDialog,
+  ScaleCapacityDialog,
+  fabricSkuLadder,
+  sameGeography,
+  useAdminMode,
+  type CapacityLifecycleAction,
+} from "../admin";
 
 interface Props {
   /** The (already filtered) workspaces to display. */
   workspaces: EnrichedWorkspace[];
+  /** Token provider for admin operations (only used in admin mode). */
+  getToken?: TokenProvider | null;
+  /** All capacities, used to offer same-geography move destinations. */
+  capacities?: Capacity[];
+  /** Incrementally refresh one capacity after a successful admin operation. */
+  onCapacityChanged?: (capacityId: string) => void;
+  /** Region/currency-aware estimated monthly compute costs. */
+  pricing?: CapacityPricing;
+  /** Per-workspace OneLake storage usage (GB), keyed by workspace id. */
+  storage?: Map<string, WorkspaceStorageUsage>;
 }
 
 /** A node in the grouped tree. Leaf capacity nodes carry `workspaces`. */
@@ -89,21 +112,169 @@ function StorageBadge({ mode }: { mode: EnrichedWorkspace["storageMode"] }) {
   return <span className={`badge storage-${mode.toLowerCase()}`}>{mode}</span>;
 }
 
-export function WorkspaceTree({ workspaces }: Props) {
+/** Three storage cells (current / billable / cache) for a workspace row. */
+function StorageCells({
+  usage,
+  metrics,
+}: {
+  usage?: WorkspaceStorageUsage;
+  metrics: { current: boolean; billable: boolean; cache: boolean };
+}) {
+  const cell = (gb?: number) =>
+    gb != null ? (
+      <span className="storage-value">{formatGb(gb)}</span>
+    ) : (
+      <span className="muted">—</span>
+    );
+  return (
+    <>
+      {metrics.current && <td className="num">{cell(usage?.currentGb)}</td>}
+      {metrics.billable && <td className="num">{cell(usage?.billableGb)}</td>}
+      {metrics.cache && <td className="num">{cell(usage?.cacheGb)}</td>}
+    </>
+  );
+}
+
+/** Sums the estimated monthly cost of every distinct capacity in a region. */
+function regionMonthlyCost(
+  region: GroupNode,
+  pricing: CapacityPricing,
+): number | undefined {
+  let total = 0;
+  let resolved = false;
+  for (const sku of region.children ?? []) {
+    for (const capacity of sku.children ?? []) {
+      const ws = capacity.workspaces?.[0];
+      if (!ws) continue;
+      const cost = pricing.monthlyCost(ws.sku, ws.region);
+      if (cost != null) {
+        total += cost;
+        resolved = true;
+      }
+    }
+  }
+  return resolved ? total : undefined;
+}
+
+/** Formats a GB amount compactly (e.g. 0.4 GB, 12 GB, 2.3 TB). */
+function formatGb(gb: number): string {
+  if (gb >= 1024) return `${(gb / 1024).toFixed(1)} TB`;
+  if (gb >= 100) return `${Math.round(gb)} GB`;
+  if (gb >= 10) return `${gb.toFixed(0)} GB`;
+  return `${gb.toFixed(1)} GB`;
+}
+
+/** Sums current OneLake storage (GB) across the given workspaces. */
+function sumCurrentGb(
+  workspaces: EnrichedWorkspace[] | undefined,
+  storage: Map<string, WorkspaceStorageUsage>,
+): number | undefined {
+  let total = 0;
+  let resolved = false;
+  for (const ws of workspaces ?? []) {
+    const usage = storage.get(ws.id.toLowerCase());
+    if (usage?.currentGb != null) {
+      total += usage.currentGb;
+      resolved = true;
+    }
+  }
+  return resolved ? total : undefined;
+}
+
+/** Sums current OneLake storage (GB) across every workspace in a region. */
+function regionCurrentGb(
+  region: GroupNode,
+  storage: Map<string, WorkspaceStorageUsage>,
+): number | undefined {
+  const workspaces: EnrichedWorkspace[] = [];
+  for (const sku of region.children ?? []) {
+    for (const capacity of sku.children ?? []) {
+      for (const ws of capacity.workspaces ?? []) workspaces.push(ws);
+    }
+  }
+  return sumCurrentGb(workspaces, storage);
+}
+
+export function WorkspaceTree({
+  workspaces,
+  getToken,
+  capacities = [],
+  onCapacityChanged,
+  pricing,
+  storage,
+}: Props) {
   const groups = useMemo(() => buildGroups(workspaces), [workspaces]);
+  const { isAdminMode } = useAdminMode();
+  // Which storage metrics are actually populated, so we only render columns
+  // that carry data (e.g. OneLake cache is absent in some Metrics app builds).
+  const storageMetrics = useMemo(() => {
+    const present = { current: false, billable: false, cache: false };
+    if (storage) {
+      for (const usage of storage.values()) {
+        if (usage.currentGb != null) present.current = true;
+        if (usage.billableGb != null) present.billable = true;
+        if (usage.cacheGb != null) present.cache = true;
+      }
+    }
+    return present;
+  }, [storage]);
+  const showStorage =
+    Boolean(storage) &&
+    (storageMetrics.current || storageMetrics.billable || storageMetrics.cache);
+  const [scaleTarget, setScaleTarget] = useState<{
+    capacityId: string;
+    capacityName: string;
+    currentSku: string;
+  } | null>(null);
+  const [lifecycleTarget, setLifecycleTarget] = useState<{
+    capacityId: string;
+    capacityName: string;
+    action: CapacityLifecycleAction;
+    currentState?: string;
+  } | null>(null);
+  const [moveTarget, setMoveTarget] = useState<{
+    workspaceId: string;
+    workspaceName: string;
+    sourceCapacityId: string;
+    region: string;
+  } | null>(null);
+  const [moveCrossTarget, setMoveCrossTarget] = useState<{
+    workspaceId: string;
+    workspaceName: string;
+    sourceCapacityId: string;
+    region: string;
+    itemTypes: string[];
+  } | null>(null);
 
   if (workspaces.length === 0) {
     return <p className="muted">No workspaces match the current filters.</p>;
   }
 
   return (
+    <>
     <div className="tree">
-      {groups.map((region) => (
+      {groups.map((region) => {
+        const regionCost = pricing ? regionMonthlyCost(region, pricing) : undefined;
+        const regionGb = storage ? regionCurrentGb(region, storage) : undefined;
+        return (
         <details key={region.key} className="region" open>
           <summary>
             <span className="group-icon">🌍</span>
             <span className="group-title">{region.label}</span>
             <span className="count">{region.count}</span>
+            {pricing && regionCost != null && (
+              <span className="capacity-cost" title="Estimated monthly compute cost (pay-as-you-go)">
+                ≈ {pricing.format(regionCost)}/mo
+              </span>
+            )}
+            {storage && regionGb != null && (
+              <span
+                className="storage-pill"
+                title="Current OneLake storage (Capacity Metrics app)"
+              >
+                💾 {formatGb(regionGb)}
+              </span>
+            )}
           </summary>
           {region.children?.map((sku) => (
             <details key={sku.key} className="sku" open>
@@ -112,19 +283,135 @@ export function WorkspaceTree({ workspaces }: Props) {
                 <span className="group-title">SKU: {sku.label}</span>
                 <span className="count">{sku.count}</span>
               </summary>
-              {sku.children?.map((capacity) => (
+              {sku.children?.map((capacity) => {
+                const firstWs = capacity.workspaces?.[0];
+                const capacityId = firstWs?.capacityId;
+                const currentSku = firstWs?.sku;
+                const currentState = firstWs?.capacityState;
+                const capacityTags = firstWs?.capacityTags;
+                const normalizedState = (currentState ?? "").toLowerCase();
+                // Fabric's /v1/capacities reports state as Active / Inactive;
+                // ARM uses Paused / Suspended. Treat any of these as stopped.
+                const isPaused =
+                  normalizedState === "paused" ||
+                  normalizedState === "suspended" ||
+                  normalizedState === "inactive";
+                const isRunning =
+                  normalizedState === "active" ||
+                  normalizedState === "running";
+                const canManageCapacity =
+                  isAdminMode &&
+                  Boolean(getToken) &&
+                  Boolean(capacityId) &&
+                  Boolean(currentSku) &&
+                  currentSku !== "(No SKU)";
+                const monthlyCost =
+                  pricing && currentSku && firstWs
+                    ? pricing.monthlyCost(currentSku, firstWs.region)
+                    : undefined;
+                const capacityGb = storage
+                  ? sumCurrentGb(capacity.workspaces, storage)
+                  : undefined;
+                return (
                 <details key={capacity.key} className="capacity" open>
                   <summary>
                     <span className="group-icon">⚡</span>
                     <span className="group-title">{capacity.label}</span>
                     <span className="count">{capacity.count}</span>
+                    {pricing && monthlyCost != null && (
+                      <span
+                        className="capacity-cost"
+                        title="Estimated monthly compute cost (pay-as-you-go, ~730h)"
+                      >
+                        ≈ {pricing.format(monthlyCost)}/mo
+                      </span>
+                    )}
+                    {storage && capacityGb != null && (
+                      <span
+                        className="storage-pill"
+                        title="Current OneLake storage (Capacity Metrics app)"
+                      >
+                        💾 {formatGb(capacityGb)}
+                      </span>
+                    )}
+                    {capacityTags &&
+                      Object.entries(capacityTags).map(([k, v]) => (
+                        <span key={k} className="badge capacity-tag">
+                          {k}: {v}
+                        </span>
+                      ))}
+                    {canManageCapacity && capacityId && currentSku && (
+                      <span className="admin-capacity-actions">
+                        <button
+                          className="link"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setScaleTarget({
+                              capacityId,
+                              capacityName: capacity.label,
+                              currentSku,
+                            });
+                          }}
+                        >
+                          Scale
+                        </button>
+                        {isRunning && (
+                          <button
+                            className="link"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLifecycleTarget({
+                                capacityId,
+                                capacityName: capacity.label,
+                                action: "pause",
+                                currentState,
+                              });
+                            }}
+                          >
+                            Pause
+                          </button>
+                        )}
+                        {isPaused && (
+                          <button
+                            className="link"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLifecycleTarget({
+                                capacityId,
+                                capacityName: capacity.label,
+                                action: "resume",
+                                currentState,
+                              });
+                            }}
+                          >
+                            Resume
+                          </button>
+                        )}
+                      </span>
+                    )}
                   </summary>
                   <table className="ws-table">
                     <thead>
                       <tr>
                         <th>Workspace</th>
+                        <th>My role</th>
+                        <th>Domain</th>
                         <th>Storage</th>
+                        <th>Default format</th>
+                        <th>Assignment</th>
                         <th>Items</th>
+                        {showStorage && storageMetrics.current && (
+                          <th title="Current OneLake storage">Current</th>
+                        )}
+                        {showStorage && storageMetrics.billable && (
+                          <th title="Billable OneLake storage">Billable</th>
+                        )}
+                        {showStorage && storageMetrics.cache && (
+                          <th title="OneLake cache storage">Cache</th>
+                        )}
                         <th>Item types</th>
                       </tr>
                     </thead>
@@ -139,11 +426,90 @@ export function WorkspaceTree({ workspaces }: Props) {
                             >
                               {ws.displayName}
                             </a>
+                            {isAdminMode &&
+                              getToken &&
+                              ws.capacityId &&
+                              ws.userRole === "Admin" && (
+                                <button
+                                  className="link admin-row-action"
+                                  onClick={() =>
+                                    setMoveTarget({
+                                      workspaceId: ws.id,
+                                      workspaceName: ws.displayName,
+                                      sourceCapacityId: ws.capacityId!,
+                                      region: ws.region,
+                                    })
+                                  }
+                                >
+                                  Move
+                                </button>
+                              )}
+                            {isAdminMode &&
+                              getToken &&
+                              ws.capacityId &&
+                              ws.userRole === "Admin" && (
+                                <button
+                                  className="link admin-row-action"
+                                  onClick={() =>
+                                    setMoveCrossTarget({
+                                      workspaceId: ws.id,
+                                      workspaceName: ws.displayName,
+                                      sourceCapacityId: ws.capacityId!,
+                                      region: ws.region,
+                                      itemTypes: ws.itemTypes,
+                                    })
+                                  }
+                                >
+                                  Move x-region
+                                </button>
+                              )}
+                          </td>
+                          <td>
+                            {ws.userRole ? (
+                              <span className="chip">{ws.userRole}</span>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
+                          <td>
+                            {ws.domainName ?? ws.domainId ? (
+                              <span
+                                className="chip"
+                                title={ws.domainId ?? undefined}
+                              >
+                                {ws.domainName ?? "Assigned"}
+                              </span>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
                           </td>
                           <td>
                             <StorageBadge mode={ws.storageMode} />
                           </td>
+                          <td>{ws.defaultStorageFormat ?? <span className="muted">—</span>}</td>
+                          <td>
+                            {ws.capacityAssignmentProgress ? (
+                              <span
+                                className={`badge assignment-${ws.capacityAssignmentProgress.toLowerCase()}`}
+                                title={
+                                  ws.capacityRegion
+                                    ? `Capacity region: ${ws.capacityRegion}`
+                                    : undefined
+                                }
+                              >
+                                {ws.capacityAssignmentProgress}
+                              </span>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
                           <td>{ws.itemCount}</td>
+                          {showStorage && (
+                            <StorageCells
+                              usage={storage?.get(ws.id.toLowerCase())}
+                              metrics={storageMetrics}
+                            />
+                          )}
                           <td className="item-types">
                             {ws.itemTypes.length === 0 ? (
                               <span className="muted">—</span>
@@ -160,11 +526,69 @@ export function WorkspaceTree({ workspaces }: Props) {
                     </tbody>
                   </table>
                 </details>
-              ))}
+                );
+              })}
             </details>
           ))}
         </details>
-      ))}
+        );
+      })}
     </div>
+    {scaleTarget && getToken && (
+      <ScaleCapacityDialog
+        getToken={getToken}
+        capacityId={scaleTarget.capacityId}
+        capacityName={scaleTarget.capacityName}
+        currentSku={scaleTarget.currentSku}
+        skuOptions={[...fabricSkuLadder]}
+        onCompleted={() => onCapacityChanged?.(scaleTarget.capacityId)}
+        onClose={() => setScaleTarget(null)}
+      />
+    )}
+    {lifecycleTarget && getToken && (
+      <PauseResumeCapacityDialog
+        getToken={getToken}
+        capacityId={lifecycleTarget.capacityId}
+        capacityName={lifecycleTarget.capacityName}
+        action={lifecycleTarget.action}
+        currentState={lifecycleTarget.currentState}
+        onCompleted={() => onCapacityChanged?.(lifecycleTarget.capacityId)}
+        onClose={() => setLifecycleTarget(null)}
+      />
+    )}
+    {moveTarget && getToken && (
+      <MoveWorkspaceSameGeoDialog
+        getToken={getToken}
+        workspaceId={moveTarget.workspaceId}
+        workspaceName={moveTarget.workspaceName}
+        sourceCapacityId={moveTarget.sourceCapacityId}
+        destinationOptions={capacities
+          .filter(
+            (c) =>
+              c.id !== moveTarget.sourceCapacityId &&
+              sameGeography(c.region, moveTarget.region),
+          )
+          .map((c) => ({ id: c.id, name: c.displayName }))}
+        onClose={() => setMoveTarget(null)}
+      />
+    )}
+    {moveCrossTarget && getToken && (
+      <MoveWorkspaceCrossRegionDialog
+        getToken={getToken}
+        workspaceId={moveCrossTarget.workspaceId}
+        workspaceName={moveCrossTarget.workspaceName}
+        sourceCapacityId={moveCrossTarget.sourceCapacityId}
+        items={moveCrossTarget.itemTypes.map((t) => ({ id: t, type: t }))}
+        destinationOptions={capacities
+          .filter(
+            (c) =>
+              c.id !== moveCrossTarget.sourceCapacityId &&
+              !sameGeography(c.region, moveCrossTarget.region),
+          )
+          .map((c) => ({ id: c.id, name: c.displayName }))}
+        onClose={() => setMoveCrossTarget(null)}
+      />
+    )}
+    </>
   );
 }

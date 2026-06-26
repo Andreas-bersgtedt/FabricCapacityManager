@@ -60,6 +60,24 @@ export const powerBiScopes = [
 ];
 
 /**
+ * Delegated scope for the Azure Resource Manager (management plane). Required by
+ * Admin Mode to scale, pause and resume Fabric capacities, which are
+ * `Microsoft.Fabric/capacities` ARM resources. Acquired on demand only when
+ * live write operations are enabled.
+ */
+export const azureArmScopes = ["https://management.azure.com/.default"];
+
+/**
+ * Delegated Fabric write scopes. Required by Admin Mode to reassign a workspace
+ * to a different capacity (`assignToCapacity`). Acquired on demand only when
+ * live write operations are enabled.
+ */
+export const fabricWriteScopes = [
+  "https://api.fabric.microsoft.com/Capacity.ReadWrite.All",
+  "https://api.fabric.microsoft.com/Workspace.ReadWrite.All",
+];
+
+/**
  * Scopes requested during the initial interactive sign-in.
  *
  * MSAL only allows scopes for a SINGLE resource per request, so we cannot mix

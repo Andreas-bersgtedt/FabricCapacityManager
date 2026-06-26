@@ -20,12 +20,45 @@ You can filter the workspaces by:
   types (Warehouse, Lakehouse, Eventhouse, KQL Database, Notebook, etc.).
 - **Name search**.
 
+## Features
+
+The app is organized into three tabs:
+
+- **Dashboard** — a tenant-wide, aggregated overview: KPI cards (workspaces,
+  capacities with running/paused split, items, regions, SKUs, estimated monthly
+  compute cost and OneLake storage) plus distribution bars by region, SKU,
+  storage mode and item type.
+- **Detail** — the grouped **Region › Capacity SKU › Capacity Name** tree with
+  per-workspace storage mode, item types, role, assignment state, optional
+  estimated monthly cost and OneLake storage pills, **Export to Excel**, and
+  (when enabled) **Admin Mode** capacity operations.
+- **Configuration** — sign in/out, display **currency** for cost estimates, and
+  the opt-in **OneLake storage** integration.
+
+Additional capabilities:
+
+- **Cost estimates** — estimated monthly pay-as-you-go compute cost per
+  capacity and region, sourced from the public **Azure Retail Prices API** in
+  your selected currency.
+- **OneLake storage (opt-in)** — current and billable OneLake storage per
+  workspace, queried from the **Microsoft Fabric Capacity Metrics** app semantic
+  model via the Power BI `executeQueries` (DAX) API. Auto-discovers the model,
+  supports a custom `EVALUATE` query, and can display the raw query results.
+- **Admin Mode** — gated capacity operations (scale, pause/resume, workspace
+  move within a geography, and cross-region move when all items support it).
+  Runs validation against a local simulation by default; opt in to live writes
+  (see below).
+- **Export to Excel** — download the loaded workspaces as a spreadsheet.
+
 ## Tech stack
 
 - Vite + React + TypeScript
 - `@azure/msal-browser` + `@azure/msal-react` for delegated (user) auth
 - Fabric REST API (`api.fabric.microsoft.com`) for workspaces, items, capacities
-- Power BI REST API (`api.powerbi.com`) for semantic-model storage mode
+- Power BI REST API (`api.powerbi.com`) for semantic-model storage mode and
+  (opt-in) OneLake storage via the Capacity Metrics model `executeQueries` API
+- Azure Retail Prices API (`prices.azure.com`) for capacity cost estimates
+- Azure Resource Manager + Fabric write APIs for optional live Admin Mode
 
 ## 1. Register an Entra application (one-time)
 
@@ -62,6 +95,30 @@ VITE_AAD_CLIENT_ID=<your application (client) id>
 VITE_AAD_TENANT_ID=<your directory (tenant) id>
 ```
 
+### Optional: enable live Admin Mode writes
+
+By default, Admin Mode operations (scale, pause/resume, workspace move) run
+real validation but execute against a local **simulation**. To make them issue
+real management-plane calls, set:
+
+```
+VITE_ADMIN_LIVE_WRITES=true
+```
+
+Live writes hit two control planes and require extra permissions:
+
+| Operation | Plane | Endpoint | Permission |
+| --- | --- | --- | --- |
+| Scale | Azure Resource Manager | `PATCH Microsoft.Fabric/capacities` (sku) | `Microsoft.Fabric/capacities/write` |
+| Pause / Resume | Azure Resource Manager | `POST .../suspend` · `.../resume` | `.../suspend/action` · `.../resume/action` |
+| Workspace move | Fabric REST | `POST /v1/workspaces/{id}/assignToCapacity` | Workspace admin + capacity contributor |
+
+In the Entra app registration, also add and admin-consent the delegated
+permissions **Azure Service Management → user_impersonation** and Fabric
+**`Capacity.ReadWrite.All`**, **`Workspace.ReadWrite.All`**. The signed-in user
+must hold the RBAC actions above on the target capacities (a custom role scoped
+to those four `Microsoft.Fabric/capacities` actions is sufficient).
+
 ## 3. Run locally
 
 ```powershell
@@ -74,6 +131,17 @@ Open <http://localhost:5173>, click **Sign in**, complete the popup, then
 
 > The dev server port (`5173`) must match the SPA redirect URI you registered.
 > To change it, update both `vite.config.ts` and the app registration.
+
+### Clean start helper
+
+[start.ps1](start.ps1) does a clean reinstall and launch: it frees the dev port
+(stops any process still listening on `5173`, so you never end up viewing stale
+code on a fallback port), removes `node_modules`, runs `npm install`, then
+`npm run dev`.
+
+```powershell
+./start.ps1
+```
 
 ## 4. Build
 
@@ -91,9 +159,17 @@ npm run preview
 | Workspaces      | `GET /v1/workspaces` (Fabric)                                           |
 | Item types      | `GET /v1/workspaces/{id}/items` (Fabric)                               |
 | Storage mode    | `GET /v1.0/myorg/groups/{id}/datasets` → `targetStorageMode` (Power BI) |
+| Cost estimate   | `GET prices.azure.com/api/retail/prices` (Azure Retail Prices) × SKU CU |
+| OneLake storage | `POST .../datasets/{id}/executeQueries` against the Capacity Metrics model (opt-in) |
 
 `targetStorageMode == "PremiumFiles"` is treated as **Large** dataset storage
 format. Workspaces with no semantic models report **No semantic model**.
+
+Cost estimates multiply the resolved per-capacity-unit hourly price for the
+region by the SKU's capacity units and the hours in a month; they are
+pay-as-you-go estimates only. OneLake storage is opt-in and read from the
+**Microsoft Fabric Capacity Metrics** app semantic model — see
+[Configuration → OneLake storage](#features).
 
 ## Notes & limitations
 
@@ -102,6 +178,17 @@ format. Workspaces with no semantic models report **No semantic model**.
   workspace it is reported as "No semantic model".
 - Item and dataset details are fetched per workspace with bounded concurrency,
   so the initial load can take a moment on large tenants.
+- Cost estimates are indicative pay-as-you-go figures from public retail
+  prices, not your negotiated/reserved pricing or actual billed amounts.
+- OneLake storage requires the **Microsoft Fabric Capacity Metrics** app to be
+  installed and accessible to the signed-in user; values come from that model.
+
+## Roadmap
+
+- See the roadmap and delivered features in [docs/ROADMAP.md](docs/ROADMAP.md).
+- **Delivered:** Admin Mode capacity operations (scale, pause/resume, same-geo
+  and gated cross-region workspace move), cost estimates, opt-in OneLake
+  storage, and the aggregated Dashboard.
 
 ## License
 

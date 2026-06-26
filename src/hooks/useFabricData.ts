@@ -8,47 +8,24 @@
 import { useCallback, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import {
-  InteractionRequiredAuthError,
-  type AccountInfo,
-  type IPublicClientApplication,
-} from "@azure/msal-browser";
-import {
+  getAdminWorkspaceStorageFormats,
+  getDomainNames,
+  getWorkspaceDetails,
+  getWorkspaceRole,
   getWorkspaceStorageMode,
   listCapacities,
   listItems,
   listWorkspaces,
   mapWithConcurrency,
-  type TokenProvider,
 } from "../api/fabricApi";
+import { adminLiveWrites, getCapacityTags } from "../admin";
+import { createTokenProvider } from "./useTokenProvider";
 import type {
   Capacity,
   EnrichedWorkspace,
   FabricData,
   StorageMode,
 } from "../types";
-
-/**
- * Builds a {@link TokenProvider} backed by MSAL. Tokens are acquired silently
- * from the cache when possible, falling back to an interactive popup when the
- * user must consent or re-authenticate (e.g. a different resource/scope).
- */
-function createTokenProvider(
-  instance: IPublicClientApplication,
-  account: AccountInfo,
-): TokenProvider {
-  return async (scopes: string[]) => {
-    try {
-      const result = await instance.acquireTokenSilent({ scopes, account });
-      return result.accessToken;
-    } catch (err) {
-      if (err instanceof InteractionRequiredAuthError) {
-        const result = await instance.acquireTokenPopup({ scopes, account });
-        return result.accessToken;
-      }
-      throw err;
-    }
-  };
-}
 
 /** Progress reported while enriching workspaces. */
 interface LoadProgress {
@@ -78,20 +55,34 @@ export function useFabricData() {
       return;
     }
     const getToken = createTokenProvider(instance, account);
+    const userObjectId = account.localAccountId;
     setLoading(true);
     setError(null);
     setData(null);
     setProgress({ total: 0, done: 0, phase: "Loading capacities & workspaces" });
 
     try {
-      const [capacities, workspaces] = await Promise.all([
+      const [capacities, workspaces, storageFormats] = await Promise.all([
         listCapacities(getToken),
         listWorkspaces(getToken),
+        getAdminWorkspaceStorageFormats(getToken),
       ]);
 
       const capacityById = new Map<string, Capacity>(
         capacities.map((c) => [c.id, c]),
       );
+
+      // Governance domain names (best-effort) and capacity Azure tags (ARM,
+      // only when live writes / ARM access is expected). Both degrade to empty.
+      const [domainNames, capacityTags] = await Promise.all([
+        getDomainNames(
+          getToken,
+          workspaces.map((w) => w.domainId ?? ""),
+        ),
+        adminLiveWrites
+          ? getCapacityTags(getToken)
+          : Promise.resolve(new Map<string, Record<string, string>>()),
+      ]);
 
       let done = 0;
       setProgress({
@@ -104,9 +95,11 @@ export function useFabricData() {
         workspaces,
         8,
         async (ws) => {
-          const [items, storageMode] = await Promise.all([
+          const [items, storageMode, userRole, details] = await Promise.all([
             listItems(getToken, ws.id).catch(() => []),
             getWorkspaceStorageMode(getToken, ws.id),
+            getWorkspaceRole(getToken, ws.id, userObjectId),
+            getWorkspaceDetails(getToken, ws.id),
           ]);
           const itemTypes = Array.from(
             new Set(items.map((i) => i.type)),
@@ -130,6 +123,16 @@ export function useFabricData() {
             capacityName: cap?.displayName ?? "(No capacity)",
             sku: cap?.sku ?? "(No SKU)",
             region: cap?.region ?? "(No region)",
+            capacityState: cap?.state,
+            userRole,
+            capacityRegion: details.capacityRegion,
+            capacityAssignmentProgress: details.capacityAssignmentProgress,
+            defaultStorageFormat: storageFormats.get(ws.id),
+            domainId: ws.domainId,
+            domainName: ws.domainId ? domainNames.get(ws.domainId) : undefined,
+            capacityTags: cap
+              ? capacityTags.get(cap.displayName.toLowerCase())
+              : undefined,
             itemTypes,
             itemCount: items.length,
             storageMode: storageMode as StorageMode,
@@ -150,5 +153,47 @@ export function useFabricData() {
     }
   }, [accounts, instance]);
 
-  return { data, loading, error, progress, load };
+  /**
+   * Incrementally refreshes a single capacity's metadata after an admin
+   * operation (scale / pause / resume) without re-enriching every workspace.
+   * Re-lists capacities, then patches the changed capacity in place and the
+   * denormalized SKU/region/state carried on each affected workspace.
+   */
+  const refreshCapacity = useCallback(
+    async (capacityId: string) => {
+      const account = accounts[0];
+      if (!account) return;
+      const getToken = createTokenProvider(instance, account);
+      try {
+        const capacities = await listCapacities(getToken);
+        const updated = capacities.find((c) => c.id === capacityId);
+        if (!updated) return;
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            capacities: prev.capacities.map((c) =>
+              c.id === capacityId ? updated : c,
+            ),
+            workspaces: prev.workspaces.map((w) =>
+              w.capacityId === capacityId
+                ? {
+                    ...w,
+                    capacityName: updated.displayName,
+                    sku: updated.sku,
+                    region: updated.region,
+                    capacityState: updated.state,
+                  }
+                : w,
+            ),
+          };
+        });
+      } catch {
+        // Best-effort: leave existing data in place on failure.
+      }
+    },
+    [accounts, instance],
+  );
+
+  return { data, loading, error, progress, load, refreshCapacity };
 }

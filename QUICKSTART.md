@@ -111,6 +111,59 @@ https://analysis.windows.net/powerbi/api/Dataset.Read.All
 [Power BI REST API permissions](https://learn.microsoft.com/rest/api/power-bi/) ·
 [Delegated vs application permissions](https://learn.microsoft.com/entra/identity-platform/permissions-consent-overview)
 
+### 2c. Optional — Admin Mode live writes (Preview)
+
+The read permissions above are **all you need** for the default, read-only app
+(inventory, dashboard, cost estimates and OneLake storage). Add the following
+**only** if you intend to enable live **Admin Mode** writes
+(`VITE_ADMIN_LIVE_WRITES=true`). They span two control planes:
+
+| API                      | Delegated permission        | Why                                               |
+| ------------------------ | --------------------------- | ------------------------------------------------- |
+| Azure Service Management | `user_impersonation`        | Scale, pause and resume capacities via ARM        |
+| Microsoft Fabric         | `Capacity.ReadWrite.All`    | Reassign workspaces to a capacity                 |
+| Microsoft Fabric         | `Workspace.ReadWrite.All`   | Reassign workspaces to a capacity                 |
+
+The scope strings the app requests on demand (from
+[src/authConfig.ts](src/authConfig.ts)) are:
+
+```text
+https://management.azure.com/.default
+https://api.fabric.microsoft.com/Capacity.ReadWrite.All
+https://api.fabric.microsoft.com/Workspace.ReadWrite.All
+```
+
+> ℹ️ Consenting to a permission is **not** authorization. For ARM operations the
+> signed-in user must also hold the matching **Azure RBAC** actions on the
+> target `Microsoft.Fabric/capacities` resources, and for the workspace move
+> they must be a **workspace admin** and a **contributor on the destination
+> capacity**. See the access reference below.
+
+📖 References:
+[Update an app's requested permissions](https://learn.microsoft.com/entra/identity-platform/howto-update-permissions) ·
+[Fabric REST API – identity & scopes](https://learn.microsoft.com/rest/api/fabric/articles/identity-support) ·
+[Azure RBAC overview](https://learn.microsoft.com/azure/role-based-access-control/overview) ·
+[Azure custom roles](https://learn.microsoft.com/azure/role-based-access-control/custom-roles)
+
+### Access reference — everything the app can require
+
+| Capability | Plane | Endpoint(s) | Delegated scope | Authorization (RBAC / role) |
+| --- | --- | --- | --- | --- |
+| List capacities (region, SKU, name, state) | Fabric REST | `GET /v1/capacities` | `Capacity.Read.All` | Member of / access to the capacity |
+| List workspaces | Fabric REST | `GET /v1/workspaces` | `Workspace.Read.All` | Workspace access (any role) |
+| List items | Fabric REST | `GET /v1/workspaces/{id}/items` | `Item.Read.All` | Workspace access (any role) |
+| Storage mode | Power BI REST | `GET /v1.0/myorg/groups/{id}/datasets` | Power BI `Dataset.Read.All` (+ `Workspace.Read.All`) | Workspace access |
+| Cost estimate | Public (Azure Retail Prices) | `GET prices.azure.com/api/retail/prices` | none (anonymous) | none |
+| OneLake storage (opt-in) | Power BI REST | `POST .../datasets/{id}/executeQueries` | Power BI `Dataset.Read.All` | Read access to the Capacity Metrics model |
+| Scale capacity (Preview) | Azure ARM | `PATCH /subscriptions/{sub}/providers/Microsoft.Fabric/capacities/{name}` (sku) | `management.azure.com/.default` | `Microsoft.Fabric/capacities/write` |
+| Pause / resume capacity (Preview) | Azure ARM | `POST .../capacities/{name}/suspend` · `.../resume` | `management.azure.com/.default` | `.../capacities/suspend/action` · `.../capacities/resume/action` |
+| Resolve ARM id / tags (for Admin Mode) | Azure ARM | `GET /subscriptions` · `GET .../Microsoft.Fabric/capacities` | `management.azure.com/.default` | `Microsoft.Fabric/capacities/read` + subscription reader |
+| Move workspace to capacity (Preview) | Fabric REST | `POST /v1/workspaces/{id}/assignToCapacity` | Fabric `Capacity.ReadWrite.All`, `Workspace.ReadWrite.All` | Workspace **admin** + **contributor** on destination capacity |
+
+> A custom Azure role scoped to the four `Microsoft.Fabric/capacities` actions
+> (`read`, `write`, `suspend/action`, `resume/action`) on the target capacities
+> (or their resource group) is sufficient for the ARM operations.
+
 ---
 
 ## Step 3 — Grant consent
@@ -123,6 +176,11 @@ Delegated permissions need consent before tokens are issued.
 - **Option B: Per-user consent.** Skip admin consent and let each user consent
   in the sign-in popup the first time they use the app. This only works if your
   tenant allows users to consent to these permissions.
+
+> If you added the optional **Admin Mode (2c)** permissions, consent them here
+> too. The ARM `user_impersonation` and Fabric `*.ReadWrite.All` scopes are
+> requested on demand the first time you run a live write, so you may see an
+> extra consent prompt then unless admin consent was already granted.
 
 📖 References:
 [Grant tenant-wide admin consent](https://learn.microsoft.com/entra/identity/enterprise-apps/grant-admin-consent) ·
@@ -172,6 +230,13 @@ users. Settings can take a few minutes to apply.
    npm run dev
    ```
 
+   Or use the clean-start helper, which frees the dev port, reinstalls
+   dependencies and launches the server:
+
+   ```powershell
+   ./start.ps1
+   ```
+
 3. Open <http://localhost:5173> → **Sign in** (complete the OAuth popup) →
    **Load workspaces**.
 
@@ -193,6 +258,14 @@ users. Settings can take a few minutes to apply.
 | Workspaces        | `GET https://api.fabric.microsoft.com/v1/workspaces`              |
 | Item types        | `GET https://api.fabric.microsoft.com/v1/workspaces/{id}/items`   |
 | Storage mode      | `GET https://api.powerbi.com/v1.0/myorg/groups/{id}/datasets`     |
+| Cost estimate     | `GET https://prices.azure.com/api/retail/prices` (no auth)        |
+| OneLake storage (opt-in) | `POST https://api.powerbi.com/v1.0/myorg/groups/{id}/datasets/{id}/executeQueries` |
+
+> The **cost estimate** call is an anonymous public API — no token or consent
+> needed. The opt-in **OneLake storage** call reuses the Power BI
+> `Dataset.Read.All` scope you already consented to in Step 2 (no extra
+> permission), and requires the **Microsoft Fabric Capacity Metrics** app to be
+> installed and visible to you.
 
 📖 API reference:
 [List Capacities](https://learn.microsoft.com/rest/api/fabric/core/capacities/list-capacities) ·
@@ -211,6 +284,7 @@ users. Settings can take a few minutes to apply.
 | `AADSTS50011` redirect mismatch | Redirect URI not registered as **SPA** or the port differs. Re-check **Step 1**. |
 | Sign-in works, but **0 workspaces** | Tenant developer settings disabled (**Step 4**), or the user genuinely has no workspace access. |
 | Storage mode always **"No semantic model"** | Power BI `Dataset.Read.All` not consented or the Power BI REST API tenant setting is off. |
+| **OneLake storage** won't load | The Capacity Metrics app isn't installed/visible to you, or auto-discovery couldn't match the model — use **Show model schema** and supply a custom `EVALUATE` query in Configuration. |
 | `403 Forbidden` on Fabric calls | *Users can use Fabric APIs* tenant setting is off, or not scoped to your group. |
 
 📖 References:
@@ -223,7 +297,9 @@ users. Settings can take a few minutes to apply.
 
 - No client secret is stored — this is a **public client**; tokens live in the
   browser's `sessionStorage` only (see [src/authConfig.ts](src/authConfig.ts)).
-- The app is **read-only**: every permission is a `*.Read.All` delegated scope.
+- As set up in this guide the app is **read-only**: every permission is a
+  `*.Read.All` delegated scope. Live **Admin Mode** writes are off by default
+  and require extra opt-in permissions — see the README for details.
 - Keep `.env` out of source control (it's already in [.gitignore](.gitignore)).
 
 For the full feature overview and developer notes, see the [README](README.md).

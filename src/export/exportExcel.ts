@@ -26,7 +26,17 @@ export function exportWorkspacesToExcel(
       "Capacity Name": ws.capacityName,
       Workspace: ws.displayName,
       "Workspace Type": ws.type,
+      "My Role": ws.userRole ?? "",
+      Domain: ws.domainName ?? (ws.domainId ? "Assigned" : ""),
       "Storage Mode": ws.storageMode,
+      "Default Storage Format": ws.defaultStorageFormat ?? "",
+      "Capacity Region": ws.capacityRegion ?? "",
+      "Capacity Tags": ws.capacityTags
+        ? Object.entries(ws.capacityTags)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(", ")
+        : "",
+      "Assignment Progress": ws.capacityAssignmentProgress ?? "",
       "Item Count": ws.itemCount,
       "Item Types": ws.itemTypes.join(", "),
       "Workspace Id": ws.id,
