@@ -20,6 +20,11 @@ import { WorkspaceTree } from "./components/WorkspaceTree";
 import { DashboardTab } from "./components/DashboardTab";
 import { exportWorkspacesToExcel } from "./export/exportExcel";
 import { AdminModeProvider, adminLiveWrites, useAdminMode } from "./admin";
+import {
+  AccessTestProvider,
+  AccessTestPanel,
+  AccessTestSummary,
+} from "./access";
 import { ConfigProvider, useConfig } from "./config/ConfigContext";
 import { StorageProvider, useStorage } from "./storage/StorageContext";
 import type { DaxRow } from "./storage/metricsApi";
@@ -84,7 +89,9 @@ export default function App() {
   return (
     <ConfigProvider>
       <StorageProvider>
-        <AppShell />
+        <AccessTestProvider>
+          <AppShell />
+        </AccessTestProvider>
       </StorageProvider>
     </ConfigProvider>
   );
@@ -127,6 +134,7 @@ function AppShell() {
           </div>
           <AuthenticatedTemplate>
             <div className="header-account">
+              <AccessTestSummary onView={() => setTab("configuration")} />
               <span className="muted">{accounts[0]?.username}</span>
             </div>
           </AuthenticatedTemplate>
@@ -383,6 +391,10 @@ function ConfigurationTab() {
           <button onClick={signIn}>Sign in</button>
         </UnauthenticatedTemplate>
       </section>
+
+      <AuthenticatedTemplate>
+        <AccessTestPanel />
+      </AuthenticatedTemplate>
 
       <section className="config-section">
         <h2>Cost estimates</h2>

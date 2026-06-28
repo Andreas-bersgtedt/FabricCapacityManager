@@ -186,6 +186,7 @@ pay-as-you-go estimates only. OneLake storage is opt-in and read from the
 ## Roadmap
 
 - See the roadmap and delivered features in [docs/ROADMAP.md](docs/ROADMAP.md).
+- See the version history in [CHANGELOG.md](./CHANGELOG.md).
 - **Delivered:** Admin Mode capacity operations (scale, pause/resume, same-geo
   and gated cross-region workspace move), cost estimates, opt-in OneLake
   storage, and the aggregated Dashboard.

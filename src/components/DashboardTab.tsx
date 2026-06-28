@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 import type { EnrichedWorkspace, WorkspaceStorageUsage } from "../types";
 import type { CapacityPricing } from "../pricing/useCapacityPricing";
+import { normalizeCapacityState } from "../capacityState";
 
 interface Props {
   workspaces: EnrichedWorkspace[];
@@ -56,14 +57,6 @@ function toBreakdown(map: Map<string, number>): Breakdown[] {
     .sort(byCountDesc);
 }
 
-/** Treats Fabric "Active/Running" and ARM "Paused/Suspended/Inactive" alike. */
-function normalizeState(state: string): "Running" | "Paused" | "Other" {
-  const s = state.toLowerCase();
-  if (s === "active" || s === "running") return "Running";
-  if (s === "paused" || s === "suspended" || s === "inactive") return "Paused";
-  return "Other";
-}
-
 export function DashboardTab({ workspaces, pricing, storage }: Props) {
   const metrics = useMemo(() => {
     // Collapse workspaces into distinct capacities (keyed by id, falling back
@@ -94,16 +87,18 @@ export function DashboardTab({ workspaces, pricing, storage }: Props) {
       }
     }
 
-    // Capacity state breakdown over distinct capacities.
+    // Capacity state breakdown over distinct capacities. Only running
+    // capacities accrue compute cost, so the monthly figure is the *current*
+    // cost rate (paused/suspended capacities are excluded).
     let running = 0;
     let paused = 0;
     let monthlyCost = 0;
     let costResolved = false;
     for (const cap of capacities.values()) {
-      const state = normalizeState(cap.state);
+      const state = normalizeCapacityState(cap.state);
       if (state === "Running") running++;
       else if (state === "Paused") paused++;
-      if (pricing) {
+      if (pricing && state === "Running") {
         const cost = pricing.monthlyCost(cap.sku, cap.region);
         if (cost != null) {
           monthlyCost += cost;
@@ -161,9 +156,9 @@ export function DashboardTab({ workspaces, pricing, storage }: Props) {
         {metrics.monthlyCost != null && pricing && (
           <KpiCard
             icon="💰"
-            label="Est. compute / mo"
+            label="Monthly cost rate"
             value={pricing.format(metrics.monthlyCost)}
-            hint="Pay-as-you-go, all capacities"
+            hint={`Running capacities only (${metrics.running} of ${metrics.capacityCount})`}
           />
         )}
         {metrics.currentGb != null && (

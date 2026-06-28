@@ -10,6 +10,7 @@ import type { Capacity, EnrichedWorkspace } from "../types";
 import type { WorkspaceStorageUsage } from "../types";
 import type { TokenProvider } from "../api/fabricApi";
 import type { CapacityPricing } from "../pricing/useCapacityPricing";
+import { normalizeCapacityState } from "../capacityState";
 import {
   MoveWorkspaceCrossRegionDialog,
   MoveWorkspaceSameGeoDialog,
@@ -135,7 +136,11 @@ function StorageCells({
   );
 }
 
-/** Sums the estimated monthly cost of every distinct capacity in a region. */
+/**
+ * Sums the estimated monthly cost of every distinct capacity in a region.
+ * Only running capacities accrue compute cost, so paused/suspended capacities
+ * are excluded — the total reflects the current monthly cost rate.
+ */
 function regionMonthlyCost(
   region: GroupNode,
   pricing: CapacityPricing,
@@ -146,6 +151,7 @@ function regionMonthlyCost(
     for (const capacity of sku.children ?? []) {
       const ws = capacity.workspaces?.[0];
       if (!ws) continue;
+      if (normalizeCapacityState(ws.capacityState) !== "Running") continue;
       const cost = pricing.monthlyCost(ws.sku, ws.region);
       if (cost != null) {
         total += cost;
@@ -289,24 +295,20 @@ export function WorkspaceTree({
                 const currentSku = firstWs?.sku;
                 const currentState = firstWs?.capacityState;
                 const capacityTags = firstWs?.capacityTags;
-                const normalizedState = (currentState ?? "").toLowerCase();
+                const runState = normalizeCapacityState(currentState);
                 // Fabric's /v1/capacities reports state as Active / Inactive;
                 // ARM uses Paused / Suspended. Treat any of these as stopped.
-                const isPaused =
-                  normalizedState === "paused" ||
-                  normalizedState === "suspended" ||
-                  normalizedState === "inactive";
-                const isRunning =
-                  normalizedState === "active" ||
-                  normalizedState === "running";
+                const isPaused = runState === "Paused";
+                const isRunning = runState === "Running";
                 const canManageCapacity =
                   isAdminMode &&
                   Boolean(getToken) &&
                   Boolean(capacityId) &&
                   Boolean(currentSku) &&
                   currentSku !== "(No SKU)";
+                // Only a running capacity accrues compute cost.
                 const monthlyCost =
-                  pricing && currentSku && firstWs
+                  pricing && currentSku && firstWs && isRunning
                     ? pricing.monthlyCost(currentSku, firstWs.region)
                     : undefined;
                 const capacityGb = storage
@@ -318,12 +320,28 @@ export function WorkspaceTree({
                     <span className="group-icon">⚡</span>
                     <span className="group-title">{capacity.label}</span>
                     <span className="count">{capacity.count}</span>
+                    {currentState && (
+                      <span
+                        className={`badge state-${runState.toLowerCase()}`}
+                        title={`Capacity state: ${currentState}`}
+                      >
+                        {isRunning ? "Running" : isPaused ? "Paused" : currentState}
+                      </span>
+                    )}
                     {pricing && monthlyCost != null && (
                       <span
                         className="capacity-cost"
                         title="Estimated monthly compute cost (pay-as-you-go, ~730h)"
                       >
                         ≈ {pricing.format(monthlyCost)}/mo
+                      </span>
+                    )}
+                    {pricing && isPaused && (
+                      <span
+                        className="capacity-cost muted"
+                        title="Paused capacities do not accrue compute cost"
+                      >
+                        no compute cost
                       </span>
                     )}
                     {storage && capacityGb != null && (

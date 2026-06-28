@@ -1,6 +1,6 @@
 {
   "name": "fabric-capacity-manager",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Local dev SPA to explore Microsoft Fabric workspaces grouped by Region, Capacity SKU and Capacity Name.",
