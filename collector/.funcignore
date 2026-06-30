@@ -1,0 +1,6 @@
+*.ts
+tsconfig.json
+.vscode
+local.settings.json
+.git*
+README.md

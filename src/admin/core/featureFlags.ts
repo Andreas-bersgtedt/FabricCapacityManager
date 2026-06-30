@@ -15,3 +15,24 @@
  */
 export const adminLiveWrites =
   import.meta.env.VITE_ADMIN_LIVE_WRITES === "true";
+
+/**
+ * Ingestion endpoint for the durable remote audit sink. When set, every admin
+ * audit event is POSTed here (in addition to the local store) so the record is
+ * retained centrally. Leave empty to keep audit local-only.
+ *
+ * Set `VITE_AUDIT_REMOTE_URL` to a collector that accepts an `AuditEvent` JSON
+ * body (e.g. an Azure Function forwarding to Application Insights / table
+ * storage).
+ */
+export const auditRemoteUrl = (
+  import.meta.env.VITE_AUDIT_REMOTE_URL ?? ""
+).trim();
+
+/**
+ * Optional Entra scope requested for the bearer token attached to audit-sink
+ * POSTs. Leave empty for an unauthenticated collector.
+ */
+export const auditRemoteScope = (
+  import.meta.env.VITE_AUDIT_REMOTE_SCOPE ?? ""
+).trim();

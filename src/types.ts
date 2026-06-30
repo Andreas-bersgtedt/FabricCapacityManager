@@ -62,6 +62,20 @@ export interface EnrichedWorkspace {
   domainName?: string;
   /** Azure resource tags on the owning capacity (key/value). */
   capacityTags?: Record<string, string>;
+  /**
+   * Percentage of the trailing 28-day window the owning capacity was Running,
+   * reconstructed from Azure Activity Log suspend/resume events. Undefined when
+   * ARM access is unavailable or the capacity could not be resolved.
+   */
+  capacityUptimePercent?: number;
+  /**
+   * Actual pre-tax compute cost billed for the owning capacity over the
+   * trailing 28-day window, from Azure Cost Management. Undefined when ARM or
+   * Cost Management access is unavailable.
+   */
+  capacityBilledCost?: number;
+  /** ISO currency code for `capacityBilledCost` (for example "USD"). */
+  capacityBilledCurrency?: string;
   /** Distinct item types present in the workspace (e.g. Lakehouse, Warehouse). */
   itemTypes: string[];
   itemCount: number;

@@ -7,6 +7,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Azure Functions
+local.settings.json
+
 # Editor / OS
 .DS_Store
 *.log

@@ -54,6 +54,7 @@ export function MoveWorkspaceSameGeoDialog({
     <ConfirmDialog
       title={`Move workspace: ${workspaceName}`}
       confirmLabel={awaitingConfirm ? "Move workspace" : "Validate"}
+      cancelLabel="Close"
       busy={busy || !destinationCapacityId}
       onCancel={onClose}
       onConfirm={() =>

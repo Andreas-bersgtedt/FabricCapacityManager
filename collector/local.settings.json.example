@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AUDIT_TENANT_ID": "<entra-tenant-guid>",
+    "AUDIT_AUDIENCE": "api://<collector-app-registration-id>",
+    "AUDIT_TABLE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+    "_comment_table_account_url": "In Azure the Bicep template sets AUDIT_TABLE_ACCOUNT_URL for keyless access instead of a connection string.",
+    "AUDIT_TABLE_NAME": "AuditEvents",
+    "AUDIT_ALLOW_ANONYMOUS": "false"
+  },
+  "Host": {
+    "CORS": "http://localhost:5173",
+    "CORSCredentials": false
+  }
+}

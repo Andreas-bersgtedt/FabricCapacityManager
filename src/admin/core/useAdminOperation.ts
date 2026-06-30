@@ -14,6 +14,7 @@ import type {
   AuditSink,
   OperationStatus,
 } from "./adminTypes";
+import { localStorageAuditSink } from "./auditStore";
 
 interface UseAdminOperationOptions {
   /** Sink to persist audit events. Defaults to console logging. */
@@ -37,8 +38,12 @@ export interface AdminOperationController<TRequest> {
   reset(): void;
 }
 
-const defaultAuditSink: AuditSink = (event) =>
+const defaultAuditSink: AuditSink = (event) => {
+  // Persist to the durable local store so the record survives a reload, and
+  // mirror to the console for live debugging.
   console.info("[admin-audit]", event);
+  localStorageAuditSink(event);
+};
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

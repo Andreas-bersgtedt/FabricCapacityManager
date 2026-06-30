@@ -12,7 +12,6 @@ import type { TokenProvider } from "../api/fabricApi";
 import type { CapacityPricing } from "../pricing/useCapacityPricing";
 import { normalizeCapacityState } from "../capacityState";
 import {
-  MoveWorkspaceCrossRegionDialog,
   MoveWorkspaceSameGeoDialog,
   PauseResumeCapacityDialog,
   ScaleCapacityDialog,
@@ -170,6 +169,31 @@ function formatGb(gb: number): string {
   return `${gb.toFixed(1)} GB`;
 }
 
+/** Formats an uptime percentage (0-100) with one decimal below 100%. */
+function formatUptime(percent: number): string {
+  const clamped = Math.min(Math.max(percent, 0), 100);
+  return clamped >= 99.95 ? "100%" : `${clamped.toFixed(1)}%`;
+}
+
+/**
+ * Formats a billed amount in its reported currency. Falls back to a plain
+ * number when the currency code is missing or not recognized.
+ */
+function formatMoney(amount: number, currency: string | undefined): string {
+  if (currency) {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      // Unknown currency code: fall through to a plain number.
+    }
+  }
+  return amount.toFixed(2);
+}
+
 /** Sums current OneLake storage (GB) across the given workspaces. */
 function sumCurrentGb(
   workspaces: EnrichedWorkspace[] | undefined,
@@ -243,13 +267,6 @@ export function WorkspaceTree({
     workspaceName: string;
     sourceCapacityId: string;
     region: string;
-  } | null>(null);
-  const [moveCrossTarget, setMoveCrossTarget] = useState<{
-    workspaceId: string;
-    workspaceName: string;
-    sourceCapacityId: string;
-    region: string;
-    itemTypes: string[];
   } | null>(null);
 
   if (workspaces.length === 0) {
@@ -342,6 +359,22 @@ export function WorkspaceTree({
                         title="Paused capacities do not accrue compute cost"
                       >
                         no compute cost
+                      </span>
+                    )}
+                    {firstWs?.capacityUptimePercent != null && (
+                      <span
+                        className="uptime-pill"
+                        title="Percentage of the last 28 days the capacity was running (Azure Activity Log suspend/resume history)"
+                      >
+                        ⏱ {formatUptime(firstWs.capacityUptimePercent)} uptime (28d)
+                      </span>
+                    )}
+                    {firstWs?.capacityBilledCost != null && (
+                      <span
+                        className="billing-pill"
+                        title="Actual pre-tax compute cost billed over the last 28 days (Azure Cost Management)"
+                      >
+                        💵 {formatMoney(firstWs.capacityBilledCost, firstWs.capacityBilledCurrency)} actual (28d)
                       </span>
                     )}
                     {storage && capacityGb != null && (
@@ -459,26 +492,7 @@ export function WorkspaceTree({
                                     })
                                   }
                                 >
-                                  Move
-                                </button>
-                              )}
-                            {isAdminMode &&
-                              getToken &&
-                              ws.capacityId &&
-                              ws.userRole === "Admin" && (
-                                <button
-                                  className="link admin-row-action"
-                                  onClick={() =>
-                                    setMoveCrossTarget({
-                                      workspaceId: ws.id,
-                                      workspaceName: ws.displayName,
-                                      sourceCapacityId: ws.capacityId!,
-                                      region: ws.region,
-                                      itemTypes: ws.itemTypes,
-                                    })
-                                  }
-                                >
-                                  Move x-region
+                                  Change to another capacity
                                 </button>
                               )}
                           </td>
@@ -588,23 +602,6 @@ export function WorkspaceTree({
           )
           .map((c) => ({ id: c.id, name: c.displayName }))}
         onClose={() => setMoveTarget(null)}
-      />
-    )}
-    {moveCrossTarget && getToken && (
-      <MoveWorkspaceCrossRegionDialog
-        getToken={getToken}
-        workspaceId={moveCrossTarget.workspaceId}
-        workspaceName={moveCrossTarget.workspaceName}
-        sourceCapacityId={moveCrossTarget.sourceCapacityId}
-        items={moveCrossTarget.itemTypes.map((t) => ({ id: t, type: t }))}
-        destinationOptions={capacities
-          .filter(
-            (c) =>
-              c.id !== moveCrossTarget.sourceCapacityId &&
-              !sameGeography(c.region, moveCrossTarget.region),
-          )
-          .map((c) => ({ id: c.id, name: c.displayName }))}
-        onClose={() => setMoveCrossTarget(null)}
       />
     )}
     </>

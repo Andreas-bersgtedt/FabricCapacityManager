@@ -7,13 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-30
+
+### Added
+
+- **Actual billed cost (28d).** Real pre-tax compute cost billed per capacity
+  over the trailing 28 days, queried from the Azure Cost Management query API.
+  Surfaced as a pill next to the retail-price estimate in the Detail tree and
+  aggregated into an "Actual cost (28d)" Dashboard KPI (grouped by currency).
+  Opt-in: gated behind live writes and best-effort on missing Cost Management
+  access or throttling.
+- **Capacity uptime (28d).** Percentage of the trailing 28 days each capacity
+  was running, reconstructed from Azure Activity Log suspend/resume events and
+  shown as a pill in the Detail tree. Opt-in: gated behind live writes and
+  best-effort on missing ARM access.
+- **Durable audit trail.** Admin operations are written to a local store that
+  survives a reload, with an in-app Audit history panel. An opt-in remote sink
+  (`VITE_AUDIT_REMOTE_URL`) forwards events to a collector backend with
+  at-least-once delivery via a retry outbox.
+- **Audit collector.** An Azure Functions backend under `collector/` validates
+  an Entra token, then writes each event to Application Insights and Azure Table
+  Storage. Ships with keyless Bicep IaC (`collector/infra/`) that provisions a
+  Flex Consumption Function App, a storage account with shared-key access
+  disabled, and least-privilege RBAC.
+
+### Changed
+
+- Renamed the workspace move button from "Move" to "Change to another capacity",
+  and the move dialog's "Cancel" button to "Close".
+
+### Removed
+
+- **Cross-region workspace move.** The operation did not reassign workspaces
+  reliably, so its slice, UI, and dialog were removed. The
+  `workspace.move.crossRegion` audit operation type and label are kept so
+  previously recorded audit events still render.
+
 ## [1.0.0] - 2026-06-28
 
 ### Added
 
 - **Access self-test.** On sign-in the app automatically lists every delegated
-  permission it relies on — for both standard (read) and admin (write) mode —
-  and probes each one to verify the signed-in user actually has the right, not
+  permission it relies on (for both standard read and admin write mode) and
+  probes each one to verify the signed-in user actually has the right, not
   just consent. Surfaced as a panel in the Configuration tab and a status pill
   in the header, with manual re-run and an interactive "Grant access" flow.
 - **Capacity run-state badge.** Each capacity in the Detail tree now shows its

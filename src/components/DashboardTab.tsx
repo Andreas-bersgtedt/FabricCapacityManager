@@ -25,6 +25,10 @@ interface CapacitySummary {
   sku: string;
   region: string;
   state: string;
+  /** Actual pre-tax cost billed over the trailing 28-day window, if known. */
+  billedCost?: number;
+  /** ISO currency code for `billedCost`. */
+  billedCurrency?: string;
 }
 
 interface Breakdown {
@@ -38,6 +42,25 @@ function formatGb(gb: number): string {
   if (gb >= 100) return `${Math.round(gb)} GB`;
   if (gb >= 10) return `${gb.toFixed(0)} GB`;
   return `${gb.toFixed(1)} GB`;
+}
+
+/**
+ * Formats a billed amount in its reported currency, falling back to a plain
+ * number when the currency code is missing or not recognized.
+ */
+function formatMoney(amount: number, currency: string | undefined): string {
+  if (currency) {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      // Unknown currency code: fall through to a plain number.
+    }
+  }
+  return amount.toFixed(2);
 }
 
 /** Sorts breakdown rows by descending count, then label. */
@@ -83,6 +106,8 @@ export function DashboardTab({ workspaces, pricing, storage }: Props) {
           sku: ws.sku,
           region: ws.region,
           state: ws.capacityState ?? "",
+          billedCost: ws.capacityBilledCost,
+          billedCurrency: ws.capacityBilledCurrency,
         });
       }
     }
@@ -122,6 +147,25 @@ export function DashboardTab({ workspaces, pricing, storage }: Props) {
       }
     }
 
+    // Actual billed compute cost (last 28 days) summed across distinct
+    // capacities, grouped by currency in case a tenant spans billing regions.
+    const billedByCurrency = new Map<string, number>();
+    for (const cap of capacities.values()) {
+      if (cap.billedCost == null) continue;
+      const code = cap.billedCurrency ?? "";
+      billedByCurrency.set(code, (billedByCurrency.get(code) ?? 0) + cap.billedCost);
+    }
+    const billedEntries = [...billedByCurrency].sort((a, b) => b[1] - a[1]);
+    const billed =
+      billedEntries.length > 0
+        ? {
+            text: billedEntries
+              .map(([code, total]) => formatMoney(total, code || undefined))
+              .join(" + "),
+            mixed: billedEntries.length > 1,
+          }
+        : undefined;
+
     return {
       workspaceCount: workspaces.length,
       capacityCount: capacities.size,
@@ -131,6 +175,7 @@ export function DashboardTab({ workspaces, pricing, storage }: Props) {
       running,
       paused,
       monthlyCost: costResolved ? monthlyCost : undefined,
+      billed,
       currentGb: storageResolved ? currentGb : undefined,
       billableGb: storageResolved ? billableGb : undefined,
       regions: toBreakdown(byRegion),
@@ -159,6 +204,18 @@ export function DashboardTab({ workspaces, pricing, storage }: Props) {
             label="Monthly cost rate"
             value={pricing.format(metrics.monthlyCost)}
             hint={`Running capacities only (${metrics.running} of ${metrics.capacityCount})`}
+          />
+        )}
+        {metrics.billed && (
+          <KpiCard
+            icon="💵"
+            label="Actual cost (28d)"
+            value={metrics.billed.text}
+            hint={
+              metrics.billed.mixed
+                ? "Pre-tax billed, multiple currencies"
+                : "Pre-tax billed (Cost Management)"
+            }
           />
         )}
         {metrics.currentGb != null && (

@@ -1,4 +1,4 @@
-# Quickstart — Set up & authorize Fabric Capacity Manager
+# Quickstart: Set up and authorize Fabric Capacity Manager
 
 This guide walks you **start to finish** through registering and authorizing the
 Microsoft Entra application that lets **Fabric Capacity Manager** sign in and
@@ -21,10 +21,10 @@ By the end you will have:
 
 ## Concepts in 30 seconds
 
-- This is a **public client SPA** — there is **no client secret**. The browser
+- This is a **public client SPA** with **no client secret**. The browser
   signs the user in interactively (OAuth 2.0 **Authorization Code flow with
   PKCE**) using **MSAL.js**.
-- The app uses **delegated permissions** — it acts *as the signed-in user*, so
+- The app uses **delegated permissions**: it acts *as the signed-in user*, so
   it only ever sees workspaces/items that user already has access to.
 - Two resources are called, each needing its own token:
   - **Microsoft Fabric API** → workspaces, items, capacities.
@@ -37,7 +37,7 @@ By the end you will have:
 
 ---
 
-## Step 1 — Register the application
+## Step 1: Register the application
 
 1. Sign in to the **[Microsoft Entra admin center](https://entra.microsoft.com)**
    → **Identity → Applications → App registrations → + New registration**.
@@ -51,7 +51,7 @@ By the end you will have:
    ```
 
 5. Click **Register**.
-6. On the **Overview** page, copy these two values — you'll need them in Step 4:
+6. On the **Overview** page, copy these two values; you'll need them in Step 4:
    - **Application (client) ID**
    - **Directory (tenant) ID**
 
@@ -66,7 +66,7 @@ By the end you will have:
 
 ---
 
-## Step 2 — Add delegated API permissions
+## Step 2: Add delegated API permissions
 
 Go to your app → **API permissions → + Add a permission**, then add the
 following **Delegated permissions**.
@@ -111,7 +111,7 @@ https://analysis.windows.net/powerbi/api/Dataset.Read.All
 [Power BI REST API permissions](https://learn.microsoft.com/rest/api/power-bi/) ·
 [Delegated vs application permissions](https://learn.microsoft.com/entra/identity-platform/permissions-consent-overview)
 
-### 2c. Optional — Admin Mode live writes (Preview)
+### 2c. Optional: Admin Mode live writes (Preview)
 
 The read permissions above are **all you need** for the default, read-only app
 (inventory, dashboard, cost estimates and OneLake storage). Add the following
@@ -145,7 +145,7 @@ https://api.fabric.microsoft.com/Workspace.ReadWrite.All
 [Azure RBAC overview](https://learn.microsoft.com/azure/role-based-access-control/overview) ·
 [Azure custom roles](https://learn.microsoft.com/azure/role-based-access-control/custom-roles)
 
-### Access reference — everything the app can require
+### Access reference: everything the app can require
 
 | Capability | Plane | Endpoint(s) | Delegated scope | Authorization (RBAC / role) |
 | --- | --- | --- | --- | --- |
@@ -166,7 +166,7 @@ https://api.fabric.microsoft.com/Workspace.ReadWrite.All
 
 ---
 
-## Step 3 — Grant consent
+## Step 3: Grant consent
 
 Delegated permissions need consent before tokens are issued.
 
@@ -189,15 +189,15 @@ Delegated permissions need consent before tokens are issued.
 
 ---
 
-## Step 4 — Enable the tenant settings (so the APIs return data)
+## Step 4: Enable the tenant settings (so the APIs return data)
 
 Even with consent, the service-side switches must be on. As a **Fabric / Power BI
 administrator** open the **[Fabric Admin portal](https://app.fabric.microsoft.com/admin-portal)**
 → **Tenant settings → Developer settings** and enable:
 
 - **Users can use Fabric APIs** (or *Service principals/users can use Fabric
-  APIs*) — required for the Fabric REST API.
-- **Allow user access to the Power BI REST APIs** (under *Developer settings*) —
+  APIs*), required for the Fabric REST API.
+- **Allow user access to the Power BI REST APIs** (under *Developer settings*),
   required for the Power BI datasets call.
 
 Scope each setting to the whole org or to a security group that includes your
@@ -210,7 +210,7 @@ users. Settings can take a few minutes to apply.
 
 ---
 
-## Step 5 — Configure & run the app
+## Step 5: Configure and run the app
 
 1. Copy the environment template and fill in the IDs from Step 1:
 
@@ -261,7 +261,7 @@ users. Settings can take a few minutes to apply.
 | Cost estimate     | `GET https://prices.azure.com/api/retail/prices` (no auth)        |
 | OneLake storage (opt-in) | `POST https://api.powerbi.com/v1.0/myorg/groups/{id}/datasets/{id}/executeQueries` |
 
-> The **cost estimate** call is an anonymous public API — no token or consent
+> The **cost estimate** call is an anonymous public API; no token or consent
 > needed. The opt-in **OneLake storage** call reuses the Power BI
 > `Dataset.Read.All` scope you already consented to in Step 2 (no extra
 > permission), and requires the **Microsoft Fabric Capacity Metrics** app to be
@@ -284,7 +284,7 @@ users. Settings can take a few minutes to apply.
 | `AADSTS50011` redirect mismatch | Redirect URI not registered as **SPA** or the port differs. Re-check **Step 1**. |
 | Sign-in works, but **0 workspaces** | Tenant developer settings disabled (**Step 4**), or the user genuinely has no workspace access. |
 | Storage mode always **"No semantic model"** | Power BI `Dataset.Read.All` not consented or the Power BI REST API tenant setting is off. |
-| **OneLake storage** won't load | The Capacity Metrics app isn't installed/visible to you, or auto-discovery couldn't match the model — use **Show model schema** and supply a custom `EVALUATE` query in Configuration. |
+| **OneLake storage** won't load | The Capacity Metrics app isn't installed/visible to you, or auto-discovery couldn't match the model; use **Show model schema** and supply a custom `EVALUATE` query in Configuration. |
 | `403 Forbidden` on Fabric calls | *Users can use Fabric APIs* tenant setting is off, or not scoped to your group. |
 
 📖 References:
@@ -295,11 +295,11 @@ users. Settings can take a few minutes to apply.
 
 ## Security notes
 
-- No client secret is stored — this is a **public client**; tokens live in the
+- No client secret is stored; this is a **public client**, and tokens live in the
   browser's `sessionStorage` only (see [src/authConfig.ts](src/authConfig.ts)).
 - As set up in this guide the app is **read-only**: every permission is a
   `*.Read.All` delegated scope. Live **Admin Mode** writes are off by default
-  and require extra opt-in permissions — see the README for details.
+  and require extra opt-in permissions; see the README for details.
 - Keep `.env` out of source control (it's already in [.gitignore](.gitignore)).
 
 For the full feature overview and developer notes, see the [README](README.md).

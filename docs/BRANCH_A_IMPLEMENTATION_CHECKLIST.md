@@ -1,11 +1,12 @@
 # Branch A - Admin Mode Implementation Checklist (GitHub Issue Pack)
 
 > **Status: Delivered.** Admin Mode is implemented in
-> [src/admin/](../src/admin/) — scale, pause/resume, same-geography move and
-> gated cross-region move, with shared confirm/preflight/operation-status
-> components. Live management-plane writes are opt-in via
-> `VITE_ADMIN_LIVE_WRITES`; otherwise operations validate against a local
-> simulation. This document is retained as the original delivery plan.
+> [src/admin/](../src/admin/): scale, pause/resume, and same-geography move,
+> with shared confirm/preflight/operation-status components. Live
+> management-plane writes are opt-in via `VITE_ADMIN_LIVE_WRITES`; otherwise
+> operations validate against a local simulation. A cross-region move was built
+> and then removed (it did not reassign workspaces reliably), so issue 5 below
+> is struck through. This document is retained as the original delivery plan.
 
 Use this document to create and track the delivery work for Branch A.
 
@@ -19,7 +20,7 @@ Deliver Admin Mode operations with safety rails and auditability:
 1. Scale capacity up/down
 2. Pause/resume capacity
 3. Move workspace to another capacity (same geography)
-4. Move workspace cross-region only when all impacted items support cross-region movement
+4. ~~Move workspace cross-region only when all impacted items support cross-region movement~~ _(removed)_
 
 ### Scope
 - In scope: UI actions, API integration, preflight validation, operation tracking, and auditable logs.
@@ -127,7 +128,10 @@ Deliver Admin Mode operations with safety rails and auditability:
 
 ---
 
-## 5. Workspace move (cross-region eligibility and workflow)
+## 5. Workspace move (cross-region eligibility and workflow) _(removed)_
+
+> Built and then removed because the operation did not reassign workspaces
+> reliably. Retained here for history.
 
 ### Title
 `[Branch A][A4] Cross-region move eligibility and guided workflow`

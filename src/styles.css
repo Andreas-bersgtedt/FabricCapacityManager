@@ -158,6 +158,31 @@ button.link.inline {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Capacity uptime pill in the tree (28-day Activity Log history) */
+.uptime-pill {
+  margin-left: 8px;
+  background: #fef7e0;
+  color: #8a6116;
+  border-radius: 10px;
+  padding: 1px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.billing-pill {
+  margin-left: 8px;
+  background: #e6f4ea;
+  color: #0b6b3a;
+  border: 1px solid #137333;
+  border-radius: 10px;
+  padding: 1px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .ws-table td.num {
   text-align: right;
   white-space: nowrap;
@@ -575,6 +600,71 @@ button.link {
 .admin-row-action {
   margin-left: 8px;
   font-size: 0.85em;
+}
+
+/* Admin audit history */
+.audit-panel {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--panel);
+}
+.audit-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.audit-panel__summary {
+  font-size: 0.8rem;
+}
+.audit-panel__clear {
+  margin-left: auto;
+}
+.audit-panel__empty {
+  margin: 10px 2px 4px;
+  font-size: 0.85rem;
+}
+.audit-panel__table-wrap {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.audit-table th,
+.audit-table td {
+  text-align: left;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.audit-table__targets {
+  white-space: normal;
+  max-width: 320px;
+}
+.audit-table__correlation {
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.72rem;
+}
+.audit-outcome {
+  text-transform: capitalize;
+  font-weight: 600;
+}
+.audit-outcome--succeeded {
+  color: #137333;
+}
+.audit-outcome--failed {
+  color: #8a1f1b;
+}
+.audit-outcome--blocked,
+.audit-outcome--cancelled {
+  color: #8a4b00;
+}
+.audit-outcome--attempted {
+  color: var(--muted);
 }
 
 /* Access self-test */

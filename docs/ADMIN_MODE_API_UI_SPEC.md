@@ -4,6 +4,12 @@
 > the shared preflight → confirm → submit → poll model lives in
 > `core/` (e.g. `useAdminOperation.ts`, `PreflightPanel`, `ConfirmDialog`,
 > `OperationStatusView`), with one slice per operation under `slices/`.
+>
+> **Cross-region move removed.** The `workspace.move.crossRegion` operation was
+> removed from the app because it did not reassign workspaces reliably. Its type
+> stays in `AdminOperationType` only so historical audit events still render.
+> The cross-region content below (validation rule 4, the support matrix, and
+> flow D) describes the original design and no longer matches shipping code.
 
 This document defines a practical API contract and UI behavior model for Branch A operations.
 
@@ -136,12 +142,12 @@ export interface MoveWorkspaceRequest {
 - Destination capacity must be healthy and accept assignments.
 - User must have required admin rights for both capacities/workspace.
 
-## 4. Workspace Move (Cross-Region)
+## 4. Workspace Move (Cross-Region) _(removed)_
 - Destination geography must differ from source.
 - Every item in workspace must pass cross-region support checks.
 - Any unsupported item blocks submit and returns detailed messages.
 
-## Cross-Region Support Matrix (Model)
+## Cross-Region Support Matrix (Model) _(removed)_
 
 ```ts
 export interface ItemMoveSupport {
@@ -190,7 +196,7 @@ export interface WorkspaceCrossRegionEligibility {
 4. Client submits and polls operation status.
 5. On success, workspace tree reloads and workspace appears under destination capacity.
 
-## Flow D: Move Workspace (Cross-Region)
+## Flow D: Move Workspace (Cross-Region) _(removed)_
 1. User selects cross-region destination.
 2. Client preflights `workspace.move.crossRegion`.
 3. UI shows eligibility report with unsupported items if any.

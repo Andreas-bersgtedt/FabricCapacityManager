@@ -19,6 +19,8 @@ import {
   mapWithConcurrency,
 } from "../api/fabricApi";
 import { adminLiveWrites, getCapacityTags } from "../admin";
+import { getCapacityUptime, type CapacityUptime } from "../api/capacityUptime";
+import { getCapacityBilling, type CapacityBilling } from "../api/capacityBilling";
 import { createTokenProvider } from "./useTokenProvider";
 import type {
   Capacity,
@@ -72,17 +74,25 @@ export function useFabricData() {
         capacities.map((c) => [c.id, c]),
       );
 
-      // Governance domain names (best-effort) and capacity Azure tags (ARM,
-      // only when live writes / ARM access is expected). Both degrade to empty.
-      const [domainNames, capacityTags] = await Promise.all([
-        getDomainNames(
-          getToken,
-          workspaces.map((w) => w.domainId ?? ""),
-        ),
-        adminLiveWrites
-          ? getCapacityTags(getToken)
-          : Promise.resolve(new Map<string, Record<string, string>>()),
-      ]);
+      // Governance domain names (best-effort) and capacity Azure tags + uptime
+      // (ARM, only when live writes / ARM access is expected). All degrade to
+      // empty when ARM is unavailable.
+      const [domainNames, capacityTags, capacityUptime, capacityBilling] =
+        await Promise.all([
+          getDomainNames(
+            getToken,
+            workspaces.map((w) => w.domainId ?? ""),
+          ),
+          adminLiveWrites
+            ? getCapacityTags(getToken)
+            : Promise.resolve(new Map<string, Record<string, string>>()),
+          adminLiveWrites
+            ? getCapacityUptime(getToken, capacities)
+            : Promise.resolve(new Map<string, CapacityUptime>()),
+          adminLiveWrites
+            ? getCapacityBilling(getToken, capacities)
+            : Promise.resolve(new Map<string, CapacityBilling>()),
+        ]);
 
       let done = 0;
       setProgress({
@@ -132,6 +142,15 @@ export function useFabricData() {
             domainName: ws.domainId ? domainNames.get(ws.domainId) : undefined,
             capacityTags: cap
               ? capacityTags.get(cap.displayName.toLowerCase())
+              : undefined,
+            capacityUptimePercent: cap
+              ? capacityUptime.get(cap.id)?.uptimePercent
+              : undefined,
+            capacityBilledCost: cap
+              ? capacityBilling.get(cap.id)?.cost
+              : undefined,
+            capacityBilledCurrency: cap
+              ? capacityBilling.get(cap.id)?.currency
               : undefined,
             itemTypes,
             itemCount: items.length,

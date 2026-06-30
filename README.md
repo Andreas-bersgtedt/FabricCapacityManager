@@ -14,9 +14,9 @@ to, grouped by:
 
 You can filter the workspaces by:
 
-- **Storage mode** — Large dataset / Small dataset / No semantic model
+- **Storage mode**: Large dataset / Small dataset / No semantic model
   (derived from each semantic model's `targetStorageMode`).
-- **Item presence** — show only workspaces that contain selected Fabric item
+- **Item presence**: show only workspaces that contain selected Fabric item
   types (Warehouse, Lakehouse, Eventhouse, KQL Database, Notebook, etc.).
 - **Name search**.
 
@@ -24,31 +24,40 @@ You can filter the workspaces by:
 
 The app is organized into three tabs:
 
-- **Dashboard** — a tenant-wide, aggregated overview: KPI cards (workspaces,
+- **Dashboard**: a tenant-wide, aggregated overview: KPI cards (workspaces,
   capacities with running/paused split, items, regions, SKUs, estimated monthly
-  compute cost and OneLake storage) plus distribution bars by region, SKU,
-  storage mode and item type.
-- **Detail** — the grouped **Region › Capacity SKU › Capacity Name** tree with
+  compute cost, actual billed cost over the last 28 days and OneLake storage)
+  plus distribution bars by region, SKU, storage mode and item type.
+- **Detail**: the grouped **Region › Capacity SKU › Capacity Name** tree with
   per-workspace storage mode, item types, role, assignment state, optional
-  estimated monthly cost and OneLake storage pills, **Export to Excel**, and
-  (when enabled) **Admin Mode** capacity operations.
-- **Configuration** — sign in/out, display **currency** for cost estimates, and
+  estimated monthly cost, actual billed cost (28d), capacity uptime (28d) and
+  OneLake storage pills, **Export to Excel**, and (when enabled) **Admin Mode**
+  capacity operations.
+- **Configuration**: sign in/out, display **currency** for cost estimates, and
   the opt-in **OneLake storage** integration.
 
 Additional capabilities:
 
-- **Cost estimates** — estimated monthly pay-as-you-go compute cost per
+- **Cost estimates**: estimated monthly pay-as-you-go compute cost per
   capacity and region, sourced from the public **Azure Retail Prices API** in
   your selected currency.
-- **OneLake storage (opt-in)** — current and billable OneLake storage per
+- **Actual billed cost (opt-in)**: real pre-tax compute cost billed per capacity
+  over the trailing 28 days, queried from the **Azure Cost Management** query
+  API. Surfaced as a pill next to the estimate and aggregated on the Dashboard.
+  Best-effort: requires ARM access (live writes) and the Cost Management Reader
+  role; degrades silently when unavailable.
+- **Capacity uptime (opt-in)**: percentage of the trailing 28 days each capacity
+  was running, reconstructed from **Azure Activity Log** suspend/resume events.
+  Best-effort: requires ARM access (live writes); degrades silently when
+  unavailable.
+- **OneLake storage (opt-in)**: current and billable OneLake storage per
   workspace, queried from the **Microsoft Fabric Capacity Metrics** app semantic
   model via the Power BI `executeQueries` (DAX) API. Auto-discovers the model,
   supports a custom `EVALUATE` query, and can display the raw query results.
-- **Admin Mode** — gated capacity operations (scale, pause/resume, workspace
-  move within a geography, and cross-region move when all items support it).
-  Runs validation against a local simulation by default; opt in to live writes
-  (see below).
-- **Export to Excel** — download the loaded workspaces as a spreadsheet.
+- **Admin Mode**: gated capacity operations: scale, pause/resume, and moving a
+  workspace to another capacity in the same geography. Runs validation against a
+  local simulation by default; opt in to live writes (see below).
+- **Export to Excel**: download the loaded workspaces as a spreadsheet.
 
 ## Tech stack
 
@@ -59,6 +68,8 @@ Additional capabilities:
   (opt-in) OneLake storage via the Capacity Metrics model `executeQueries` API
 - Azure Retail Prices API (`prices.azure.com`) for capacity cost estimates
 - Azure Resource Manager + Fabric write APIs for optional live Admin Mode
+- Azure Resource Manager Activity Log and Cost Management query APIs for
+  optional capacity uptime and actual billed cost
 
 ## 1. Register an Entra application (one-time)
 
@@ -160,6 +171,8 @@ npm run preview
 | Item types      | `GET /v1/workspaces/{id}/items` (Fabric)                               |
 | Storage mode    | `GET /v1.0/myorg/groups/{id}/datasets` → `targetStorageMode` (Power BI) |
 | Cost estimate   | `GET prices.azure.com/api/retail/prices` (Azure Retail Prices) × SKU CU |
+| Actual billed cost | `POST .../Microsoft.CostManagement/query` (Cost Management, 28d, opt-in) |
+| Capacity uptime | `GET .../Microsoft.Insights/eventtypes/management/values` (Activity Log, 28d, opt-in) |
 | OneLake storage | `POST .../datasets/{id}/executeQueries` against the Capacity Metrics model (opt-in) |
 
 `targetStorageMode == "PremiumFiles"` is treated as **Large** dataset storage
@@ -168,7 +181,7 @@ format. Workspaces with no semantic models report **No semantic model**.
 Cost estimates multiply the resolved per-capacity-unit hourly price for the
 region by the SKU's capacity units and the hours in a month; they are
 pay-as-you-go estimates only. OneLake storage is opt-in and read from the
-**Microsoft Fabric Capacity Metrics** app semantic model — see
+**Microsoft Fabric Capacity Metrics** app semantic model; see
 [Configuration → OneLake storage](#features).
 
 ## Notes & limitations
@@ -179,7 +192,12 @@ pay-as-you-go estimates only. OneLake storage is opt-in and read from the
 - Item and dataset details are fetched per workspace with bounded concurrency,
   so the initial load can take a moment on large tenants.
 - Cost estimates are indicative pay-as-you-go figures from public retail
-  prices, not your negotiated/reserved pricing or actual billed amounts.
+  prices, not your negotiated/reserved pricing. For actual invoiced amounts,
+  enable the **Actual billed cost** feature below.
+- Actual billed cost and capacity uptime are opt-in and only computed when live
+  writes are enabled (`VITE_ADMIN_LIVE_WRITES=true`), since both call Azure
+  Resource Manager. Actual cost additionally requires the Cost Management Reader
+  role; both degrade silently to no value when access is missing or throttled.
 - OneLake storage requires the **Microsoft Fabric Capacity Metrics** app to be
   installed and accessible to the signed-in user; values come from that model.
 
@@ -187,9 +205,9 @@ pay-as-you-go estimates only. OneLake storage is opt-in and read from the
 
 - See the roadmap and delivered features in [docs/ROADMAP.md](docs/ROADMAP.md).
 - See the version history in [CHANGELOG.md](./CHANGELOG.md).
-- **Delivered:** Admin Mode capacity operations (scale, pause/resume, same-geo
-  and gated cross-region workspace move), cost estimates, opt-in OneLake
-  storage, and the aggregated Dashboard.
+- **Delivered:** Admin Mode capacity operations (scale, pause/resume, and
+  same-geography workspace move), cost estimates, opt-in OneLake storage, and
+  the aggregated Dashboard.
 
 ## License
 

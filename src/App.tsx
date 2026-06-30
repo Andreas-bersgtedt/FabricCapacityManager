@@ -19,7 +19,14 @@ import { FiltersPanel } from "./components/FiltersPanel";
 import { WorkspaceTree } from "./components/WorkspaceTree";
 import { DashboardTab } from "./components/DashboardTab";
 import { exportWorkspacesToExcel } from "./export/exportExcel";
-import { AdminModeProvider, adminLiveWrites, useAdminMode } from "./admin";
+import {
+  AdminModeProvider,
+  AuditProvider,
+  AuditHistoryPanel,
+  adminLiveWrites,
+  auditRemoteScope,
+  useAdminMode,
+} from "./admin";
 import {
   AccessTestProvider,
   AccessTestPanel,
@@ -122,9 +129,23 @@ function AppShell() {
     [data],
   );
 
+  // Bearer-token provider for the remote audit collector. Only meaningful when
+  // both a sink scope and a signed-in token provider are available.
+  const auditAccessToken = useMemo(
+    () =>
+      getToken && auditRemoteScope
+        ? () => getToken([auditRemoteScope])
+        : undefined,
+    [getToken],
+  );
+
   return (
     <AdminModeProvider canManage={canManage}>
-      <div className="app">
+      <AuditProvider
+        actorObjectId={accounts[0]?.localAccountId}
+        getAccessToken={auditAccessToken}
+      >
+        <div className="app">
         <header className="app-header">
           <div>
             <h1>Fabric Capacity Manager</h1>
@@ -195,7 +216,8 @@ function AppShell() {
         ) : (
           <ConfigurationTab />
         )}
-      </div>
+        </div>
+      </AuditProvider>
     </AdminModeProvider>
   );
 }
@@ -262,6 +284,7 @@ function DetailTab({
         </div>
 
         <AdminBanner />
+        <AuditHistoryPanel />
         {error && <div className="error">{error}</div>}
 
         {loading && progress && (
